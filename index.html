@@ -405,6 +405,29 @@
     </footer>
   </div>
 
+      <!-- Row 7 (New Blocks) -->
+      <div class="card">
+          <h2>Медіанна ЗП за Основним Девайсом</h2>
+          <div class="chart-container">
+              <canvas id="salaryByDeviceChart"></canvas>
+          </div>
+          <div class="insights">
+              <h3 class="insights-title">Ключові моменти</h3>
+              <ul class="insights-list" id="salaryByDeviceInsights"></ul>
+          </div>
+      </div>
+
+      <div class="card">
+          <h2>Медіанна ЗП за Рівнем Задоволеності</h2>
+          <div class="chart-container">
+              <canvas id="salaryBySatisfactionChart"></canvas>
+          </div>
+          <div class="insights">
+              <h3 class="insights-title">Ключові моменти</h3>
+              <ul class="insights-list" id="salaryBySatisfactionInsights"></ul>
+          </div>
+      </div>
+
   <!-- Embed CSV Data -->
   <script id="csvDataScript" type="text/csv">
 Timestamp,Досвід,У якій сфері ти працюєш?,З цим працюємо зараз (В основному або більшість часу),Питання про гроші (В долярах),OS для розробки,Штучка інтелект,Чи задоволений ти своєю зарплатою і компанією зараз?,Як ви навчилися кодити?,Мій основний девайс
@@ -970,8 +993,84 @@ Timestamp,Досвід,У якій сфері ти працюєш?,З цим п�
      }
 
 
+    // --- Data Calculation Helpers (New) ---
+
+    /**
+     * Обчислює медіанну зарплату для кожної групи в заданому ключі.
+     * @param {Array} data - Масив оброблених даних опитування.
+     * @param {String} groupKey - Ключ для групування (наприклад, 'device', 'satisfaction').
+     * @returns {Object} - Об'єкт, де ключі - це значення груп, а значення - медіанна ЗП.
+     */
+    function calculateMedianSalaryByGroup(data, groupKey) {
+        const salariesByGroup = {};
+
+        // 1. Групуємо зарплати (лише ті, що > 0)
+        data.forEach(row => {
+            const groupValue = row[groupKey];
+            const salary = row.salaryNum;
+
+            // Враховуємо лише тих, хто має зарплату > 0
+            if (salary !== null && salary > 0 && groupValue) {
+                if (!salariesByGroup[groupValue]) {
+                    salariesByGroup[groupValue] = [];
+                }
+                salariesByGroup[groupValue].push(salary);
+            }
+        });
+
+        // 2. Обчислюємо медіану для кожної групи
+        const medianSalaries = {};
+        for (const group in salariesByGroup) {
+            const salaries = salariesByGroup[group];
+            if (salaries.length > 0) {
+                salaries.sort((a, b) => a - b); // Сортуємо для медіани
+                const mid = Math.floor(salaries.length / 2);
+                const median = salaries.length % 2 !== 0
+                    ? salaries[mid]
+                    : (salaries[mid - 1] + salaries[mid]) / 2;
+                medianSalaries[group] = Math.round(median);
+            } else {
+                 medianSalaries[group] = 0; // Або null, якщо група є, але зарплат немає
+            }
+        }
+        return medianSalaries;
+    }
+
+     /**
+      * Готує дані для графіка порівняння зарплат за групами.
+      * @param {Object} medianSalaries - Об'єкт з медіанними зарплатами за групами.
+      * @param {Array} labelsOrder - (Опціонально) Порядок міток для графіка.
+      * @returns {Object} - Об'єкт з labels та data для Chart.js.
+      */
+     function prepareSalaryComparisonChartData(medianSalaries, labelsOrder = null) {
+         let sortedEntries = Object.entries(medianSalaries)
+             .filter(([, salary]) => salary > 0); // Показуємо лише групи з ЗП > 0
+
+         if (labelsOrder) {
+             // Сортуємо згідно з заданим порядком, решту додаємо в кінці
+             sortedEntries.sort((a, b) => {
+                 const indexA = labelsOrder.indexOf(a[0]);
+                 const indexB = labelsOrder.indexOf(b[0]);
+                 if (indexA === -1 && indexB === -1) return 0; // Обидва не в списку
+                 if (indexA === -1) return 1; // a не в списку, b - в списку
+                 if (indexB === -1) return -1; // b не в списку, a - в списку
+                 return indexA - indexB; // Обидва в списку, сортуємо за порядком
+             });
+         } else {
+             // Сортуємо за спаданням зарплати за замовчуванням
+             sortedEntries.sort((a, b) => b[1] - a[1]);
+         }
+
+         return {
+             labels: sortedEntries.map(entry => entry[0]),
+             data: sortedEntries.map(entry => entry[1])
+         };
+     }
+
+
     // --- Insight Generation ---
 
+    // --- Insight Generation ---
     function createInsights(data) {
          const totalRespondents = data.length;
          document.getElementById('respondentCount').textContent = totalRespondents;
@@ -987,56 +1086,77 @@ Timestamp,Досвід,У якій сфері ти працюєш?,З цим п�
              aiUsage: document.getElementById('aiUsageInsights'),
              learningMethod: document.getElementById('learningMethodInsights'),
              device: document.getElementById('deviceInsights'),
+             // Додаємо нові елементи списку для інсайтів
+             salaryByDevice: document.getElementById('salaryByDeviceInsights'), // Новий ID
+             salaryBySatisfaction: document.getElementById('salaryBySatisfactionInsights') // Новий ID
          };
 
          // Clear previous insights
-         Object.values(insights).forEach(el => el.innerHTML = '');
+         Object.values(insights).forEach(el => {
+             // Перевіряємо, чи елемент існує перед тим, як чистити
+             if (el) {
+                 el.innerHTML = '';
+             } else {
+                // console.warn("Insight list element not found during clearing."); // Для діагностики, якщо потрібно
+             }
+         });
 
          // --- Experience Insights ---
          const experienceData = prepareExperienceData(data);
-         const mostCommonExpGroup = experienceData.labels[experienceData.data.indexOf(Math.max(...experienceData.data))];
-         addInsight(insights.experience, `Найбільш поширена група досвіду: ${mostCommonExpGroup}.`);
-         const seniorDevsPercent = Math.round((experienceData.data[experienceData.labels.indexOf('7+ років')] || 0) / totalRespondents * 100);
-         addInsight(insights.experience, `${seniorDevsPercent}% респондентів мають 7+ років досвіду.`);
-         const juniorDevsPercent = Math.round(((experienceData.data[experienceData.labels.indexOf('0 років (Без досв.)')] || 0) + (experienceData.data[experienceData.labels.indexOf('0-1 рік')] || 0)) / totalRespondents * 100);
-         addInsight(insights.experience, `${juniorDevsPercent}% мають менше 1 року комерційного досвіду або ще навчаються.`);
+         if (insights.experience && experienceData.labels.length > 0) {
+             const mostCommonExpGroup = experienceData.labels[experienceData.data.indexOf(Math.max(...experienceData.data))];
+             addInsight(insights.experience, `Найбільш поширена група досвіду: ${mostCommonExpGroup}.`);
+             const seniorDevsPercent = Math.round((experienceData.data[experienceData.labels.indexOf('7+ років')] || 0) / totalRespondents * 100);
+             addInsight(insights.experience, `${seniorDevsPercent}% респондентів мають 7+ років досвіду.`);
+             const juniorDevsPercent = Math.round(((experienceData.data[experienceData.labels.indexOf('0 років (Без досв.)')] || 0) + (experienceData.data[experienceData.labels.indexOf('0-1 рік')] || 0)) / totalRespondents * 100);
+             addInsight(insights.experience, `${juniorDevsPercent}% мають менше 1 року комерційного досвіду або ще навчаються.`);
+         } else if (insights.experience) {
+            addInsight(insights.experience, `Недостатньо даних для аналізу досвіду.`);
+         }
 
          // --- Salary Insights ---
          const salaryData = prepareSalaryData(data);
-         const validSalaries = data.map(r => r.salaryNum).filter(s => s !== null && s > 0); // Exclude 0/null for avg/median
-         if (validSalaries.length > 0) {
-            validSalaries.sort((a, b) => a - b);
-            const medianSalary = validSalaries.length % 2 !== 0
-                ? validSalaries[Math.floor(validSalaries.length / 2)]
-                : (validSalaries[validSalaries.length / 2 - 1] + validSalaries[validSalaries.length / 2]) / 2;
-            addInsight(insights.salary, `Медіанна зарплата (серед тих, хто вказав > 0$): $${Math.round(medianSalary)}.`);
-            const highEarnersPercent = Math.round(validSalaries.filter(s => s > 5000).length / validSalaries.length * 100);
-            addInsight(insights.salary, `${highEarnersPercent}% розробників із зарплатою заробляють понад $5000.`);
-         } else {
-             addInsight(insights.salary, "Недостатньо даних про зарплату > 0 для розрахунку медіани.");
+         if (insights.salary) {
+             const validSalaries = data.map(r => r.salaryNum).filter(s => s !== null && s > 0); // Exclude 0/null for avg/median
+             if (validSalaries.length > 0) {
+                validSalaries.sort((a, b) => a - b);
+                const medianSalary = validSalaries.length % 2 !== 0
+                    ? validSalaries[Math.floor(validSalaries.length / 2)]
+                    : (validSalaries[validSalaries.length / 2 - 1] + validSalaries[validSalaries.length / 2]) / 2;
+                addInsight(insights.salary, `Медіанна зарплата (серед тих, хто вказав > 0$): $${Math.round(medianSalary)}.`);
+                const highEarnersPercent = Math.round(validSalaries.filter(s => s > 5000).length / validSalaries.length * 100);
+                addInsight(insights.salary, `${highEarnersPercent}% розробників із зарплатою заробляють понад $5000.`);
+             } else {
+                 addInsight(insights.salary, "Недостатньо даних про зарплату > 0 для розрахунку медіани.");
+             }
+             const learnersCount = salaryData.data[salaryData.labels.indexOf('0 (Навчання)')] || 0;
+             addInsight(insights.salary, `${learnersCount} респондентів (${Math.round(learnersCount/totalRespondents*100)}%) вказали, що навчаються (0$).`);
          }
-         const learnersCount = salaryData.data[salaryData.labels.indexOf('0 (Навчання)')] || 0;
-         addInsight(insights.salary, `${learnersCount} респондентів (${Math.round(learnersCount/totalRespondents*100)}%) вказали, що навчаються (0$).`);
 
          // --- Tech Insights ---
          const techData = prepareTechData(data);
-         if (techData.labels.length > 0) {
+         if (insights.tech && techData.labels.length > 0) {
             addInsight(insights.tech, `${techData.labels[0]} є найпопулярнішою UI технологією (${techData.data[0]} згадок).`);
              const composeCount = techData.data[techData.labels.indexOf('Jetpack Compose')] || 0;
              const xmlCount = techData.data[techData.labels.indexOf('XML')] || 0;
              if (composeCount > 0 || xmlCount > 0) {
-                 const totalUiDevs = composeCount + xmlCount; // Rough estimate
-                 addInsight(insights.tech, `Jetpack Compose використовують ~${Math.round(composeCount / totalUiDevs * 100)}%, XML ~${Math.round(xmlCount / totalUiDevs * 100)}% серед тих, хто вказав одну з цих технологій.`);
+                 // Розрахунок відсотка серед тих, хто вказав Compose АБО XML
+                 const relevantRespondents = data.filter(r => r.technologiesParsed.includes('Jetpack Compose') || r.technologiesParsed.includes('XML')).length;
+                 if (relevantRespondents > 0) {
+                     addInsight(insights.tech, `Jetpack Compose використовують ~${Math.round(composeCount / relevantRespondents * 100)}%, XML ~${Math.round(xmlCount / relevantRespondents * 100)}% серед тих, хто вказав одну з цих двох технологій.`);
+                 }
              }
              const kmpCount = techData.data[techData.labels.indexOf('KMP')] || 0;
              if (kmpCount > 0) {
                 addInsight(insights.tech, `Kotlin Multiplatform (KMP) згадали ${kmpCount} (${Math.round(kmpCount / totalRespondents * 100)}%) розробників.`);
              }
+         } else if (insights.tech) {
+             addInsight(insights.tech, `Недостатньо даних для аналізу технологій.`);
          }
 
          // --- Correlation Insights ---
          const correlationData = prepareCorrelationData(data);
-         if (correlationData.length >= 2) {
+         if (insights.correlation && correlationData.length >= 2) {
              const startSalary = correlationData[0].y;
              const endSalary = correlationData[correlationData.length - 1].y;
              addInsight(insights.correlation, `Медіанна зарплата зростає з ~\$${startSalary} для початківців до ~\$${endSalary} для розробників з 7+ роками досвіду.`);
@@ -1053,72 +1173,100 @@ Timestamp,Досвід,У якій сфері ти працюєш?,З цим п�
              if (maxJump > 0) {
                 addInsight(insights.correlation, `Найбільший стрибок у медіанній ЗП спостерігається при переході ${jumpLabel} (+\$${maxJump}).`);
              }
-         } else {
+         } else if (insights.correlation) {
               addInsight(insights.correlation, "Недостатньо даних для показу чіткої кореляції зарплати та досвіду.");
          }
 
         // --- Work Sphere Insights ---
         const workSphereData = prepareGenericDistributionData(data, 'workSphere');
-        if (workSphereData.labels.length > 0) {
+        if (insights.workSphere && workSphereData.labels.length > 0) {
             const topSphere = workSphereData.labels[0];
             const topSpherePercent = Math.round(workSphereData.data[0] / totalRespondents * 100);
             addInsight(insights.workSphere, `Більшість (${topSpherePercent}%) працюють у сфері "${topSphere}".`);
             const outsourcePercent = Math.round((workSphereData.data[workSphereData.labels.indexOf('Аутсорс')] || 0) / totalRespondents * 100);
-            addInsight(insights.workSphere, `${outsourcePercent}% респондентів працюють на аутсорсі.`);
+             const productPercent = Math.round((workSphereData.data[workSphereData.labels.indexOf('Продукт')] || 0) / totalRespondents * 100);
+            addInsight(insights.workSphere, `Розподіл: Продукт - ${productPercent}%, Аутсорс - ${outsourcePercent}%.`);
+        } else if (insights.workSphere) {
+             addInsight(insights.workSphere, `Недостатньо даних для аналізу сфер роботи.`);
         }
 
         // --- OS Insights ---
         const osData = prepareGenericDistributionData(data, 'os');
-         if (osData.labels.length > 0) {
+         if (insights.os && osData.labels.length > 0) {
             const topOS = osData.labels[0];
             const topOSPercent = Math.round(osData.data[0] / totalRespondents * 100);
             addInsight(insights.os, `${topOS} є домінуючою ОС для розробки (${topOSPercent}%).`);
             const windowsPercent = Math.round((osData.data[osData.labels.indexOf('Windows')] || 0) / totalRespondents * 100);
-            addInsight(insights.os, `Windows використовують ${windowsPercent}% розробників.`);
+            const linuxPercent = Math.round((osData.data[osData.labels.indexOf('Linux')] || 0) / totalRespondents * 100);
+            addInsight(insights.os, `Інші популярні ОС: Windows (${windowsPercent}%) та Linux (${linuxPercent}%).`);
+         } else if (insights.os) {
+             addInsight(insights.os, `Недостатньо даних для аналізу ОС.`);
          }
 
          // --- Satisfaction Insights ---
          const satisfactionData = prepareGenericDistributionData(data, 'satisfaction');
-         if (satisfactionData.labels.length > 0) {
+         if (insights.satisfaction && satisfactionData.labels.length > 0) {
             const satisfiedPercent = Math.round((satisfactionData.data[satisfactionData.labels.indexOf('Задоволений(а)')] || 0) / totalRespondents * 100);
             addInsight(insights.satisfaction, `${satisfiedPercent}% респондентів задоволені поточною роботою та зарплатою.`);
             const dissatisfiedSalaryPercent = Math.round((satisfactionData.data[satisfactionData.labels.indexOf('Незадоволений(а) (ЗП)')] || 0) / totalRespondents * 100);
              const dissatisfiedBothPercent = Math.round((satisfactionData.data[satisfactionData.labels.indexOf('Незадоволений(а) (Робота та ЗП)')] || 0) / totalRespondents * 100);
-            addInsight(insights.satisfaction, `Близько ${dissatisfiedSalaryPercent + dissatisfiedBothPercent}% не задоволені рівнем зарплати (частково або повністю).`);
+             const dissatisfiedJobPercent = Math.round((satisfactionData.data[satisfactionData.labels.indexOf('Незадоволений(а) (Робота)')] || 0) / totalRespondents * 100);
+             const totalDissatisfiedPercent = dissatisfiedSalaryPercent + dissatisfiedBothPercent + dissatisfiedJobPercent;
+            addInsight(insights.satisfaction, `Загалом ${totalDissatisfiedPercent}% не задоволені (ЗП: ${dissatisfiedSalaryPercent}%, Робота: ${dissatisfiedJobPercent}%, Обидва: ${dissatisfiedBothPercent}%).`);
+         } else if (insights.satisfaction) {
+             addInsight(insights.satisfaction, `Недостатньо даних для аналізу задоволеності.`);
          }
 
          // --- AI Usage Insights ---
         const aiUsageData = prepareGenericDistributionData(data, 'aiUsage');
-        const aiOrder = ['Весь час', 'Багато', 'Трохи', 'Не користуюся (Хейтер)', 'Не вказано'];
-        aiUsageData.labels.sort((a, b) => aiOrder.indexOf(a) - aiOrder.indexOf(b)); // Sort by usage level
-        aiUsageData.data = aiUsageData.labels.map(label => {
-            const originalIndex = prepareGenericDistributionData(data, 'aiUsage').labels.indexOf(label);
-            return prepareGenericDistributionData(data, 'aiUsage').data[originalIndex] || 0;
-        });
+        // Переконуємось, що дані існують перед сортуванням
+        if (aiUsageData.labels.length > 0) {
+            const aiOrder = ['Весь час', 'Багато', 'Трохи', 'Не користуюся (Хейтер)', 'Не вказано'];
+            aiUsageData.labels.sort((a, b) => {
+                 const indexA = aiOrder.indexOf(a);
+                 const indexB = aiOrder.indexOf(b);
+                 // Handle cases where a label might not be in aiOrder (shouldn't happen with current parsing, but good practice)
+                 if (indexA === -1) return 1;
+                 if (indexB === -1) return -1;
+                 return indexA - indexB;
+             });
+            // Перебудовуємо дані відповідно до нового порядку міток
+            const originalCounts = prepareGenericDistributionData(data, 'aiUsage'); // Get original counts again
+            const sortedAIDataCounts = aiUsageData.labels.map(label => {
+                const originalIndex = originalCounts.labels.indexOf(label);
+                return originalIndex !== -1 ? originalCounts.data[originalIndex] : 0;
+            });
 
-         if (aiUsageData.labels.length > 0) {
-            const frequentUsersPercent = Math.round(((aiUsageData.data[aiUsageData.labels.indexOf('Весь час')] || 0) + (aiUsageData.data[aiUsageData.labels.indexOf('Багато')] || 0)) / totalRespondents * 100);
-            addInsight(insights.aiUsage, `${frequentUsersPercent}% активно використовують інструменти ШІ у своїй роботі.`);
-            const hatersPercent = Math.round((aiUsageData.data[aiUsageData.labels.indexOf('Не користуюся (Хейтер)')] || 0) / totalRespondents * 100);
-             if (hatersPercent > 0) {
-                addInsight(insights.aiUsage, `${hatersPercent}% свідомо не використовують ШІ.`);
+             if (insights.aiUsage) {
+                const frequentUsersPercent = Math.round(((sortedAIDataCounts[aiUsageData.labels.indexOf('Весь час')] || 0) + (sortedAIDataCounts[aiUsageData.labels.indexOf('Багато')] || 0)) / totalRespondents * 100);
+                addInsight(insights.aiUsage, `${frequentUsersPercent}% активно використовують інструменти ШІ у своїй роботі ('Весь час' або 'Багато').`);
+                const hatersPercent = Math.round((sortedAIDataCounts[aiUsageData.labels.indexOf('Не користуюся (Хейтер)')] || 0) / totalRespondents * 100);
+                 if (hatersPercent > 0) {
+                    addInsight(insights.aiUsage, `${hatersPercent}% свідомо не використовують ШІ.`);
+                 }
              }
+         } else if (insights.aiUsage) {
+             addInsight(insights.aiUsage, `Недостатньо даних про використання ШІ.`);
          }
+
 
         // --- Learning Methods Insights ---
         const learningData = prepareLearningMethodsData(data); // Uses percentages
-        if (learningData.labels.length > 0) {
+        if (insights.learningMethod && learningData.labels.length > 0) {
             addInsight(insights.learningMethod, `"${learningData.labels[0]}" - найпопулярніший спосіб навчання (${learningData.data[0]}% респондентів).`);
             const uniPercent = learningData.data[learningData.labels.indexOf('Універ')] || 0;
             const coursesPercent = learningData.data[learningData.labels.indexOf('Курси')] || 0;
-            addInsight(insights.learningMethod, `Формальна освіта: ${uniPercent}% згадали Універ, ${coursesPercent}% - Курси.`);
+             const selfPercent = learningData.data[learningData.labels.indexOf('Самостійно')] || 0;
+            addInsight(insights.learningMethod, `Самостійне навчання (${selfPercent}%) домінує над формальними методами (Універ: ${uniPercent}%, Курси: ${coursesPercent}%).`);
             const youtubePercent = learningData.data[learningData.labels.indexOf('Youtube Туторіали')] || 0;
              addInsight(insights.learningMethod, `${youtubePercent}% вчилися за допомогою Youtube туторіалів.`);
+        } else if (insights.learningMethod) {
+             addInsight(insights.learningMethod, `Недостатньо даних про методи навчання.`);
         }
 
          // --- Device Insights ---
          const deviceData = prepareGenericDistributionData(data, 'device');
-         if (deviceData.labels.length > 0) {
+         if (insights.device && deviceData.labels.length > 0) {
             const androidPercent = Math.round((deviceData.data[deviceData.labels.indexOf('Android')] || 0) / totalRespondents * 100);
             const iphonePercent = Math.round((deviceData.data[deviceData.labels.indexOf('iPhone')] || 0) / totalRespondents * 100);
             addInsight(insights.device, `Розподіл основних девайсів: ${androidPercent}% Android, ${iphonePercent}% iPhone.`);
@@ -1127,192 +1275,478 @@ Timestamp,Досвід,У якій сфері ти працюєш?,З цим п�
              } else if (iphonePercent > androidPercent) {
                   addInsight(insights.device, `iPhone трохи популярніший як основний девайс серед розробників.`);
              }
+         } else if (insights.device) {
+             addInsight(insights.device, `Недостатньо даних про основні девайси.`);
          }
-     }
+
+         // --- Salary by Device Insights (New) ---
+         // Перевіряємо чи існує елемент для інсайтів перед обчисленням
+         if (insights.salaryByDevice) {
+             // ОГОЛОШЕННЯ ЗМІННОЇ ЛИШЕ ОДИН РАЗ ТУТ
+             const medianSalaryByDevice = calculateMedianSalaryByGroup(data, 'device');
+             const androidSalary = medianSalaryByDevice['Android'];
+             const iphoneSalary = medianSalaryByDevice['iPhone'];
+
+             if (androidSalary) {
+                 addInsight(insights.salaryByDevice, `Медіанна ЗП власників Android: $${androidSalary}`);
+             } else {
+                 addInsight(insights.salaryByDevice, `Недостатньо даних про ЗП власників Android.`);
+             }
+             if (iphoneSalary) {
+                 addInsight(insights.salaryByDevice, `Медіанна ЗП власників iPhone: $${iphoneSalary}`);
+             } else {
+                  addInsight(insights.salaryByDevice, `Недостатньо даних про ЗП власників iPhone.`);
+             }
+
+             if (androidSalary && iphoneSalary) {
+                 const diff = Math.abs(androidSalary - iphoneSalary);
+                 const higher = androidSalary >= iphoneSalary ? 'Android' : 'iPhone'; // >= для випадку рівності
+                 const comparisonWord = androidSalary === iphoneSalary ? 'приблизно однакові' : `на $${diff} вище у власників ${higher}`;
+                 addInsight(insights.salaryByDevice, `Медіанні зарплати ${comparisonWord}.`);
+             } else if (androidSalary || iphoneSalary) {
+                 addInsight(insights.salaryByDevice, `Недостатньо даних для прямого порівняння зарплат власників Android та iPhone.`);
+             }
+         }
 
 
-    // --- Chart Creation ---
-    function createChart(ctx, type, data, options = {}) {
-        // Destroy previous chart instance if exists
-        if (charts[ctx.canvas.id]) {
-            charts[ctx.canvas.id].destroy();
+         // --- Salary by Satisfaction Insights (New) ---
+         // Перевіряємо чи існує елемент для інсайтів перед обчисленням
+         if (insights.salaryBySatisfaction) {
+            // ОГОЛОШЕННЯ ЗМІННОЇ ЛИШЕ ОДИН РАЗ ТУТ
+            const medianSalaryBySatisfaction = calculateMedianSalaryByGroup(data, 'satisfaction');
+
+            // Групуємо незадоволених для порівняння
+            const dissatisfiedSalaries = Object.entries(medianSalaryBySatisfaction)
+                .filter(([key, value]) => key.startsWith('Незадоволений') && value > 0)
+                .map(([, value]) => value);
+
+           let medianDissatisfied = 0;
+           if (dissatisfiedSalaries.length > 0) {
+               dissatisfiedSalaries.sort((a, b) => a - b);
+               const mid = Math.floor(dissatisfiedSalaries.length / 2);
+               medianDissatisfied = dissatisfiedSalaries.length % 2 !== 0
+                   ? dissatisfiedSalaries[mid]
+                   : (dissatisfiedSalaries[mid - 1] + dissatisfiedSalaries[mid]) / 2;
+               medianDissatisfied = Math.round(medianDissatisfied);
+           }
+
+            const satisfiedSalary = medianSalaryBySatisfaction['Задоволений(а)'];
+
+            if (satisfiedSalary) {
+                addInsight(insights.salaryBySatisfaction, `Медіанна ЗП задоволених співробітників: $${satisfiedSalary}`);
+            } else {
+                 addInsight(insights.salaryBySatisfaction, `Недостатньо даних про ЗП задоволених співробітників.`);
+            }
+
+            if (medianDissatisfied > 0) {
+                addInsight(insights.salaryBySatisfaction, `Медіанна ЗП незадоволених співробітників (усі причини): $${medianDissatisfied}`);
+            } else {
+                addInsight(insights.salaryBySatisfaction, `Недостатньо даних про ЗП незадоволених співробітників.`);
+                // Можна додати деталізацію за причинами, якщо потрібно і дані є
+                 const salaryDissatisfied = medianSalaryBySatisfaction['Незадоволений(а) (ЗП)'];
+                 const jobDissatisfied = medianSalaryBySatisfaction['Незадоволений(а) (Робота)'];
+                 const bothDissatisfied = medianSalaryBySatisfaction['Незадоволений(а) (Робота та ЗП)'];
+                 if (salaryDissatisfied) addInsight(insights.salaryBySatisfaction, `(ЗП: $${salaryDissatisfied})`);
+                 if (jobDissatisfied) addInsight(insights.salaryBySatisfaction, `(Робота: $${jobDissatisfied})`);
+                 if (bothDissatisfied) addInsight(insights.salaryBySatisfaction, `(Обидва: $${bothDissatisfied})`);
+            }
+
+            if (satisfiedSalary && medianDissatisfied > 0) {
+                const diff = satisfiedSalary - medianDissatisfied;
+                if (diff > 0) {
+                    addInsight(insights.salaryBySatisfaction, `Задоволені співробітники в середньому заробляють на $${diff} більше за незадоволених.`);
+                } else if (diff < 0) {
+                    addInsight(insights.salaryBySatisfaction, `Незадоволені співробітники в середньому заробляють на $${Math.abs(diff)} більше за задоволених.`);
+                } else {
+                    addInsight(insights.salaryBySatisfaction, `Медіанні зарплати задоволених та незадоволених співробітників приблизно однакові.`);
+                }
+            }
+         }
+
+     } // <--- Кінець функції createInsights
+
+
+      // --- Chart Creation ---
+    function createChart(ctx, type, chartData, specificOptions = {}) {
+        // 1. Перевірка наявності контексту
+        if (!ctx) {
+            console.error("Chart context is missing for chart ID:", ctx?.canvas?.id || 'unknown');
+            return;
+        }
+        const chartId = ctx.canvas.id;
+
+        // 2. Знищення попереднього графіка, якщо він існує
+        if (charts[chartId]) {
+            charts[chartId].destroy();
         }
 
+        // 3. Отримання кольорів та базових налаштувань з CSS
         const computedStyle = getComputedStyle(document.documentElement);
         const textColor = computedStyle.getPropertyValue('--text-color');
         const gridColor = computedStyle.getPropertyValue('--chart-grid');
-         const palette = [
-            computedStyle.getPropertyValue('--palette-1'),
-            computedStyle.getPropertyValue('--palette-2'),
-            computedStyle.getPropertyValue('--palette-3'),
-            computedStyle.getPropertyValue('--palette-4'),
-            computedStyle.getPropertyValue('--palette-5'),
-            computedStyle.getPropertyValue('--palette-6'),
+        const palette = [
+            computedStyle.getPropertyValue('--palette-1'), // Blue
+            computedStyle.getPropertyValue('--palette-2'), // Red
+            computedStyle.getPropertyValue('--palette-3'), // Yellow
+            computedStyle.getPropertyValue('--palette-4'), // Green
+            computedStyle.getPropertyValue('--palette-5'), // Orange
+            computedStyle.getPropertyValue('--palette-6'), // Darker Blue
         ];
-        const satisfactionColors = [
-             computedStyle.getPropertyValue('--success-color'), // Так
-             computedStyle.getPropertyValue('--warning-color'), // Ні, ЗП
-             computedStyle.getPropertyValue('--error-color'),   // Ні, робота
-             computedStyle.getPropertyValue('--error-color'),   // Ні, обидва
-             gridColor // Не вказано
-        ];
+         // Специфічні кольори для графіка задоволеності
+         const satisfactionColors = {
+             'Задоволений(а)': computedStyle.getPropertyValue('--success-color'),
+             'Незадоволений(а) (ЗП)': computedStyle.getPropertyValue('--warning-color'),
+             'Незадоволений(а) (Робота)': computedStyle.getPropertyValue('--error-color'),
+             'Незадоволений(а) (Робота та ЗП)': computedStyle.getPropertyValue('--error-color'), // Можна інший відтінок червоного
+             'Незадоволений(а) (усі)': computedStyle.getPropertyValue('--error-color'), // Для згрупованого показника
+             'Не вказано': gridColor
+         };
 
-         let backgroundColors = palette; // Default for pie/doughnut
-         if (type === 'bar' || type === 'line') {
-             backgroundColors = palette[0]; // Use first color for bars/lines by default
-         }
-         if (ctx.canvas.id === 'satisfactionChart') {
-             // Map colors based on labels
-             const satLabels = data.labels;
-             backgroundColors = satLabels.map(label => {
-                 if (label.includes('Задоволений')) return satisfactionColors[0];
-                 if (label.includes('(ЗП)')) return satisfactionColors[1];
-                  if (label.includes('(Робота та ЗП)')) return satisfactionColors[3]; // Both
-                  if (label.includes('(Робота)')) return satisfactionColors[2];
-                 return satisfactionColors[4]; // Default/Не вказано
-             });
-         }
+        // 4. Визначення типу даних (стандартний чи XY для кореляції)
+        let datasets;
+        let labels = chartData.labels; // За замовчуванням беремо з chartData
 
+        // Для кореляційного графіка (Line chart з XY даними)
+        if (chartId === 'correlationChart' && Array.isArray(chartData) && chartData.length > 0 && chartData[0].hasOwnProperty('x')) {
+            labels = chartData.map(p => p.x); // Мітки беруться з X значень
+            datasets = [{
+                label: specificOptions.datasetLabel || 'Медіанна Зарплата ($)',
+                data: chartData, // Дані вже у форматі {x, y}
+                borderColor: palette[0],
+                backgroundColor: palette[0], // Для точки
+                borderWidth: 2,
+                fill: false,
+                tension: 0.1
+            }];
+        }
+        // Для всіх інших графіків (очікується формат { labels: [], data: [] })
+        else if (chartData && chartData.labels && chartData.data) {
+            let backgroundColors;
 
+             // Визначення кольорів для конкретних графіків або типів
+             if (chartId === 'satisfactionChart') {
+                backgroundColors = chartData.labels.map(label => satisfactionColors[label] || gridColor);
+             } else if (type === 'pie' || type === 'doughnut') {
+                backgroundColors = palette;
+             } else { // bar, line (не кореляційний)
+                backgroundColors = palette[0]; // Основний колір для стовпчиків/ліній
+             }
+
+             datasets = [{
+                 label: specificOptions.datasetLabel || 'Кількість',
+                 data: chartData.data,
+                 backgroundColor: backgroundColors,
+                  // Додаємо рамку для кращого вигляду, особливо на Pie/Doughnut
+                  borderColor: (type === 'pie' || type === 'doughnut')
+                     ? computedStyle.getPropertyValue('--card-bg') // Колір фону картки для розділення секторів
+                     : (type === 'bar' ? backgroundColors : palette[0]), // Для барів - той самий колір, для лінії - теж
+                  borderWidth: (type === 'pie' || type === 'doughnut') ? 2 : 1.5, // Товщина рамки
+                  ...(type === 'line' && { fill: false }) // Не заливати під лінією
+             }];
+        } else {
+            console.error("Invalid chart data provided for chart ID:", chartId, chartData);
+            // Можна відобразити повідомлення на місці графіка
+            ctx.canvas.parentElement.innerHTML = `<p style="text-align: center; margin-top: 50px; color: ${textColor};">Помилка: Некоректні дані для графіка.</p>`;
+            return; // Зупиняємо створення графіка
+        }
+
+        // 5. Формування опцій графіка
         const defaultOptions = {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
                 legend: {
-                     display: type === 'pie' || type === 'doughnut' || ctx.canvas.id === 'satisfactionChart', // Show legend for pies/doughnuts and satisfaction
+                    // Показуємо легенду для кругових діаграм та специфічних випадків
+                    display: (type === 'pie' || type === 'doughnut'),
                     position: 'bottom',
                     labels: {
-                         color: textColor,
-                         padding: 15,
-                         boxWidth: 12,
-                         font: { size: 11 }
-                     }
-                 },
-                 tooltip: {
-                     backgroundColor: 'rgba(0,0,0,0.7)',
-                     titleColor: '#ffffff',
-                     bodyColor: '#ffffff',
-                     padding: 10,
-                     cornerRadius: 5
-                 }
+                        color: textColor,
+                        padding: 15,
+                        boxWidth: 12,
+                        font: { size: 11 }
+                    }
+                },
+                tooltip: {
+                    backgroundColor: 'rgba(0,0,0,0.75)',
+                    titleColor: '#ffffff',
+                    bodyColor: '#ffffff',
+                    padding: 10,
+                    cornerRadius: 5,
+                    callbacks: {} // Залишаємо місце для специфічних колбеків
+                }
             },
-             scales: (type === 'bar' || type === 'line') ? { // Only add scales for bar/line
+            scales: {} // За замовчуванням - порожній об'єкт
+        };
+
+        // Додавання осей для Bar та Line графіків
+        if (type === 'bar' || type === 'line') {
+             defaultOptions.scales = {
                 x: {
-                    grid: { display: false, color: gridColor },
-                    ticks: { color: textColor }
+                     grid: { display: false, color: gridColor },
+                     ticks: { color: textColor, maxRotation: 45, minRotation: 0 }, // Автоматичний поворот міток, якщо потрібно
+                     ...(chartId === 'correlationChart' && { type: 'category', labels: labels }) // Специфічно для кореляції
                  },
                  y: {
-                     beginAtZero: true,
+                     beginAtZero: true, // Більшість графіків починаються з 0
                      grid: { color: gridColor },
                      ticks: { color: textColor }
                  }
-            } : {}, // No scales for pie/doughnut
-            // Specific options for line chart (correlation)
-             ...(type === 'line' && {
-                 elements: {
-                     line: { tension: 0.1 }, // Slight curve
-                     point: { radius: 5, hoverRadius: 7 }
-                 }
-             }),
-            // Specific options for bar chart (learning methods)
-             ...(ctx.canvas.id === 'learningMethodChart' && {
-                 indexAxis: 'y', // Horizontal bars if many categories
-                 scales: {
-                     x: {
-                         ticks: {
-                             callback: function(value) { return value + "%" } // Add percentage sign
-                         }
-                     }
-                 },
-                  plugins: {
-                    tooltip: {
-                        callbacks: {
-                            label: function(context) {
-                                return context.dataset.label + ': ' + context.parsed.x + '%';
-                            }
-                        }
-                    }
-                }
-             }),
+            };
 
-         };
+            // Специфічні налаштування осі Y для зарплатних графіків
+             if (['correlationChart', 'salaryByDeviceChart', 'salaryBySatisfactionChart'].includes(chartId)) {
+                defaultOptions.scales.y.beginAtZero = false; // Зарплата не завжди з 0
+                defaultOptions.scales.y.ticks.callback = function(value) { return '$' + value; };
+                // Додаємо $ до тултіпа для цих графіків
+                 defaultOptions.plugins.tooltip.callbacks.label = function(context) {
+                     let label = context.dataset.label || '';
+                     if (label) { label += ': '; }
+                     label += '$' + context.parsed.y;
+                     return label;
+                 };
+            }
 
+             // Специфічні налаштування осі X для графіка методів навчання (%)
+             if (chartId === 'learningMethodChart') {
+                defaultOptions.indexAxis = 'y'; // Горизонтальні бари
+                 defaultOptions.scales.x.ticks.callback = function(value) { return value + "%"; };
+                 defaultOptions.plugins.tooltip.callbacks.label = function(context) {
+                      let label = context.dataset.label || '';
+                      if (label) { label += ': '; }
+                      label += context.parsed.x + '%'; // Використовуємо parsed.x для горизонтальних барів
+                      return label;
+                 };
+                 // Налаштування осі Y для кращого відображення довгих назв методів
+                 defaultOptions.scales.y.ticks.font = { size: 10 }; // Менший шрифт
+                 defaultOptions.scales.y.ticks.autoSkip = false; // Показувати всі мітки
+             }
+
+             // Налаштування для звичайного Line графіка (якщо буде)
+             if (type === 'line' && chartId !== 'correlationChart') {
+                  defaultOptions.elements = { line: { tension: 0.1 } };
+             }
+        }
+
+        // 6. Створення конфігурації та нового графіка
         const chartConfig = {
              type: type,
              data: {
-                 labels: data.labels,
-                 datasets: [{
-                     label: options.datasetLabel || 'Кількість', // Default label
-                     data: data.data,
-                     backgroundColor: backgroundColors,
-                     borderColor: (type === 'line') ? palette[0] : (type === 'bar' ? backgroundColors : palette.map(c => c + 'cc')), // Add slight border to bars/pies
-                     borderWidth: (type === 'pie' || type === 'doughnut') ? 0 : 1.5,
-                     ...(type === 'line' && { fill: false }), // Don't fill under line chart
-                 }]
+                 labels: labels, // Використовуємо визначені раніше мітки
+                 datasets: datasets
              },
-            options: { ...defaultOptions, ...options } // Merge default and specific options
+            // Об'єднуємо базові та специфічні опції (специфічні перезаписують базові)
+            options: { ...defaultOptions, ...specificOptions }
         };
 
-         // For Correlation Chart (Line) - data format is {x, y}
-        if (ctx.canvas.id === 'correlationChart') {
-            chartConfig.data = {
-                // labels: data.map(p => p.x), // Labels are derived from points for line chart
-                 datasets: [{
-                     label: 'Медіанна Зарплата ($)',
-                     data: data, // Already in {x, y} format
-                     backgroundColor: palette[0],
-                     borderColor: palette[0],
-                     borderWidth: 2,
-                     fill: false,
-                     tension: 0.1
-                 }]
-             };
-            // Adjust scales for correlation chart to use category axis for experience labels
-            chartConfig.options.scales = {
-                x: {
-                     type: 'category', // Use category axis for experience labels
-                     labels: data.map(p => p.x), // Provide the labels explicitly
-                     grid: { display: false, color: gridColor },
-                     ticks: { color: textColor }
-                 },
-                 y: {
-                     beginAtZero: false, // Salary doesn't have to start at 0
-                     grid: { color: gridColor },
-                     ticks: {
-                         color: textColor,
-                         callback: function(value) { return '$' + value; } // Add dollar sign
-                     }
-                 }
-            };
-         }
-
-         charts[ctx.canvas.id] = new Chart(ctx, chartConfig);
-     }
+        // Створюємо та зберігаємо графік
+        try {
+             charts[chartId] = new Chart(ctx, chartConfig);
+        } catch (error) {
+            console.error("Error creating chart:", chartId, error);
+             ctx.canvas.parentElement.innerHTML = `<p style="text-align: center; margin-top: 50px; color: ${textColor};">Помилка створення графіка.</p>`;
+        }
+    }
+  
 
     function createAllCharts(processedData) {
-        createChart(document.getElementById('experienceChart').getContext('2d'), 'bar', prepareExperienceData(processedData), { datasetLabel: 'Розробників' });
-        createChart(document.getElementById('salaryChart').getContext('2d'), 'bar', prepareSalaryData(processedData), { datasetLabel: 'Розробників'});
-        createChart(document.getElementById('techChart').getContext('2d'), 'doughnut', prepareTechData(processedData), { datasetLabel: 'Згадок'});
-        createChart(document.getElementById('correlationChart').getContext('2d'), 'line', prepareCorrelationData(processedData));
-        createChart(document.getElementById('workSphereChart').getContext('2d'), 'pie', prepareGenericDistributionData(processedData, 'workSphere'), { datasetLabel: 'Розробників'});
-        createChart(document.getElementById('osChart').getContext('2d'), 'pie', prepareGenericDistributionData(processedData, 'os'), { datasetLabel: 'Розробників'});
-        createChart(document.getElementById('satisfactionChart').getContext('2d'), 'doughnut', prepareGenericDistributionData(processedData, 'satisfaction'), { datasetLabel: 'Розробників'});
+        // --- Experience Chart ---
+        const experienceCtx = document.getElementById('experienceChart')?.getContext('2d');
+        if (experienceCtx) {
+            const experienceChartData = prepareExperienceData(processedData);
+            if (experienceChartData.data.some(d => d > 0)) { // Перевірка, чи є дані
+                 createChart(experienceCtx, 'bar', experienceChartData, { datasetLabel: 'Розробників' });
+            } else {
+                experienceCtx.canvas.parentElement.innerHTML = '<p class="chart-nodata">Недостатньо даних.</p>';
+            }
+        }
 
-        // AI Usage - Use Bar chart as order matters somewhat
-        const aiUsageData = prepareGenericDistributionData(processedData, 'aiUsage');
-        const aiOrder = ['Весь час', 'Багато', 'Трохи', 'Не користуюся (Хейтер)', 'Не вказано'];
-        aiUsageData.labels.sort((a, b) => aiOrder.indexOf(a) - aiOrder.indexOf(b)); // Sort by usage level
-        aiUsageData.data = aiUsageData.labels.map(label => {
-             const originalIndex = prepareGenericDistributionData(processedData, 'aiUsage').labels.indexOf(label); // Find original count
-             return prepareGenericDistributionData(processedData, 'aiUsage').data[originalIndex] || 0;
-        });
-        createChart(document.getElementById('aiUsageChart').getContext('2d'), 'bar', aiUsageData, { datasetLabel: 'Розробників'});
+        // --- Salary Chart ---
+        const salaryCtx = document.getElementById('salaryChart')?.getContext('2d');
+        if (salaryCtx) {
+            const salaryChartData = prepareSalaryData(processedData);
+             if (salaryChartData.data.some(d => d > 0)) {
+                createChart(salaryCtx, 'bar', salaryChartData, { datasetLabel: 'Розробників'});
+            } else {
+                salaryCtx.canvas.parentElement.innerHTML = '<p class="chart-nodata">Недостатньо даних.</p>';
+            }
+        }
 
-        createChart(document.getElementById('learningMethodChart').getContext('2d'), 'bar', prepareLearningMethodsData(processedData), { datasetLabel: '% респондентів'});
-        createChart(document.getElementById('deviceChart').getContext('2d'), 'pie', prepareGenericDistributionData(processedData, 'device'), { datasetLabel: 'Розробників'});
+        // --- Tech Chart ---
+        const techCtx = document.getElementById('techChart')?.getContext('2d');
+        if (techCtx) {
+            const techChartData = prepareTechData(processedData);
+             if (techChartData.data.some(d => d > 0)) {
+                createChart(techCtx, 'doughnut', techChartData, { datasetLabel: 'Згадок'});
+            } else {
+                 techCtx.canvas.parentElement.innerHTML = '<p class="chart-nodata">Недостатньо даних.</p>';
+            }
+        }
 
-        updateChartColors(); // Apply theme colors after creation
-     }
+        // --- Correlation Chart (Salary vs Experience) ---
+        const correlationCtx = document.getElementById('correlationChart')?.getContext('2d');
+        if (correlationCtx) {
+            const correlationChartData = prepareCorrelationData(processedData);
+            // Для line chart треба хоча б 2 точки
+            if (correlationChartData.length >= 2) {
+                // Передаємо безпосередньо масив {x, y} точок
+                createChart(correlationCtx, 'line', correlationChartData, { datasetLabel: 'Медіанна Зарплата ($)' });
+            } else {
+                correlationCtx.canvas.parentElement.innerHTML = '<p class="chart-nodata">Недостатньо даних для побудови кореляції.</p>';
+            }
+        }
+
+        // --- Work Sphere Chart ---
+        const workSphereCtx = document.getElementById('workSphereChart')?.getContext('2d');
+        if (workSphereCtx) {
+            const workSphereChartData = prepareGenericDistributionData(processedData, 'workSphere');
+             if (workSphereChartData.data.some(d => d > 0)) {
+                 createChart(workSphereCtx, 'pie', workSphereChartData, { datasetLabel: 'Розробників'});
+            } else {
+                 workSphereCtx.canvas.parentElement.innerHTML = '<p class="chart-nodata">Недостатньо даних.</p>';
+            }
+        }
+
+        // --- OS Chart ---
+        const osCtx = document.getElementById('osChart')?.getContext('2d');
+        if (osCtx) {
+            const osChartData = prepareGenericDistributionData(processedData, 'os');
+            if (osChartData.data.some(d => d > 0)) {
+                 createChart(osCtx, 'pie', osChartData, { datasetLabel: 'Розробників'});
+            } else {
+                 osCtx.canvas.parentElement.innerHTML = '<p class="chart-nodata">Недостатньо даних.</p>';
+            }
+        }
+
+        // --- Satisfaction Chart ---
+        const satisfactionCtx = document.getElementById('satisfactionChart')?.getContext('2d');
+        if (satisfactionCtx) {
+            const satisfactionChartData = prepareGenericDistributionData(processedData, 'satisfaction');
+             if (satisfactionChartData.data.some(d => d > 0)) {
+                // Передаємо специфічний datasetLabel, хоча createChart може мати логіку для кольорів за ID
+                createChart(satisfactionCtx, 'doughnut', satisfactionChartData, { datasetLabel: 'Розробників'});
+            } else {
+                 satisfactionCtx.canvas.parentElement.innerHTML = '<p class="chart-nodata">Недостатньо даних.</p>';
+            }
+        }
+
+        // --- AI Usage Chart ---
+        const aiUsageCtx = document.getElementById('aiUsageChart')?.getContext('2d');
+        if (aiUsageCtx) {
+            // Готуємо дані та сортуємо їх за логічним порядком використання
+            const aiUsageDistribution = prepareGenericDistributionData(processedData, 'aiUsage');
+             if (aiUsageDistribution.data.some(d => d > 0)) {
+                 const aiOrder = ['Весь час', 'Багато', 'Трохи', 'Не користуюся (Хейтер)', 'Не вказано'];
+                 // Сортуємо мітки згідно з порядком
+                 aiUsageDistribution.labels.sort((a, b) => {
+                     const indexA = aiOrder.indexOf(a);
+                     const indexB = aiOrder.indexOf(b);
+                     if (indexA === -1) return 1;
+                     if (indexB === -1) return -1;
+                     return indexA - indexB;
+                 });
+                 // Перебудовуємо масив даних відповідно до відсортованих міток
+                 const originalCounts = prepareGenericDistributionData(processedData, 'aiUsage'); // Отримуємо оригінальні дані ще раз для правильних значень
+                 const sortedAIData = aiUsageDistribution.labels.map(label => {
+                     const originalIndex = originalCounts.labels.indexOf(label);
+                     return originalIndex !== -1 ? originalCounts.data[originalIndex] : 0;
+                 });
+                 const sortedAIChartData = { labels: aiUsageDistribution.labels, data: sortedAIData };
+
+                 createChart(aiUsageCtx, 'bar', sortedAIChartData, { datasetLabel: 'Розробників'});
+            } else {
+                 aiUsageCtx.canvas.parentElement.innerHTML = '<p class="chart-nodata">Недостатньо даних.</p>';
+            }
+        }
+
+        // --- Learning Method Chart ---
+        const learningMethodCtx = document.getElementById('learningMethodChart')?.getContext('2d');
+        if (learningMethodCtx) {
+            const learningMethodChartData = prepareLearningMethodsData(processedData); // Повертає %
+             if (learningMethodChartData.data.some(d => d > 0)) {
+                // Передаємо специфічні опції для горизонтальних барів та % в createChart
+                createChart(learningMethodCtx, 'bar', learningMethodChartData, { datasetLabel: '% респондентів'});
+            } else {
+                 learningMethodCtx.canvas.parentElement.innerHTML = '<p class="chart-nodata">Недостатньо даних.</p>';
+            }
+        }
+
+        // --- Device Chart ---
+        const deviceCtx = document.getElementById('deviceChart')?.getContext('2d');
+        if (deviceCtx) {
+            const deviceChartData = prepareGenericDistributionData(processedData, 'device');
+             if (deviceChartData.data.some(d => d > 0)) {
+                 createChart(deviceCtx, 'pie', deviceChartData, { datasetLabel: 'Розробників'});
+            } else {
+                 deviceCtx.canvas.parentElement.innerHTML = '<p class="chart-nodata">Недостатньо даних.</p>';
+            }
+        }
+
+        // --- Salary by Device Chart (New) ---
+        const salaryByDeviceCtx = document.getElementById('salaryByDeviceChart')?.getContext('2d');
+        if (salaryByDeviceCtx) {
+            const medianSalaryByDevice = calculateMedianSalaryByGroup(processedData, 'device');
+            const deviceSalaryChartData = prepareSalaryComparisonChartData({
+                'Android': medianSalaryByDevice['Android'] || 0,
+                'iPhone': medianSalaryByDevice['iPhone'] || 0
+            }, ['Android', 'iPhone']); // Явно задаємо порядок стовпців
+
+             // Перевіряємо, чи є хоча б одне значення більше 0
+            if (deviceSalaryChartData.data.some(d => d > 0)) {
+                // Передаємо опції для форматування осі Y ($) в createChart
+                createChart(salaryByDeviceCtx, 'bar', deviceSalaryChartData, { datasetLabel: 'Медіанна ЗП ($)' });
+            } else {
+                salaryByDeviceCtx.canvas.parentElement.innerHTML = '<p class="chart-nodata">Недостатньо даних для порівняння зарплат за девайсом.</p>';
+            }
+        }
+
+        // --- Salary by Satisfaction Chart (New) ---
+        const salaryBySatisfactionCtx = document.getElementById('salaryBySatisfactionChart')?.getContext('2d');
+        if (salaryBySatisfactionCtx) {
+            const medianSalaryBySatisfaction = calculateMedianSalaryByGroup(processedData, 'satisfaction');
+             // Згрупуємо незадоволених для графіка, як і в інсайтах
+             const dissatisfiedSalariesForChart = Object.entries(medianSalaryBySatisfaction)
+                 .filter(([key, value]) => key.startsWith('Незадоволений') && value > 0)
+                 .map(([, value]) => value);
+            let medianDissatisfiedForChart = 0;
+             if (dissatisfiedSalariesForChart.length > 0) {
+                 dissatisfiedSalariesForChart.sort((a, b) => a - b);
+                 const mid = Math.floor(dissatisfiedSalariesForChart.length / 2);
+                 medianDissatisfiedForChart = dissatisfiedSalariesForChart.length % 2 !== 0
+                     ? dissatisfiedSalariesForChart[mid]
+                     : (dissatisfiedSalariesForChart[mid - 1] + dissatisfiedSalariesForChart[mid]) / 2;
+                 medianDissatisfiedForChart = Math.round(medianDissatisfiedForChart);
+             }
+
+            const satisfactionSalaryChartData = prepareSalaryComparisonChartData({
+                'Задоволений(а)': medianSalaryBySatisfaction['Задоволений(а)'] || 0,
+                'Незадоволений(а) (усі)': medianDissatisfiedForChart
+            }, ['Задоволений(а)', 'Незадоволений(а) (усі)']); // Задаємо порядок
+
+             // Перевіряємо, чи є хоча б одне значення більше 0
+             if (satisfactionSalaryChartData.data.some(d => d > 0)) {
+                 // Передаємо опції для форматування осі Y ($) в createChart
+                 createChart(salaryBySatisfactionCtx, 'bar', satisfactionSalaryChartData, { datasetLabel: 'Медіанна ЗП ($)' });
+            } else {
+                 salaryBySatisfactionCtx.canvas.parentElement.innerHTML = '<p class="chart-nodata">Недостатньо даних для порівняння зарплат за задоволеністю.</p>';
+            }
+        }
+
+        // Переконайтесь, що ця функція викликається після створення ВСІХ графіків
+        updateChartColors();
+
+        // Додамо стиль для повідомлень про відсутність даних
+        const noDataStyle = document.createElement('style');
+        noDataStyle.textContent = `
+            .chart-nodata {
+                text-align: center;
+                margin-top: 40%; /* Центрування по вертикалі приблизно */
+                color: var(--text-color);
+                opacity: 0.7;
+                font-style: italic;
+            }
+        `;
+        document.head.appendChild(noDataStyle);
+    }
 
 
     // --- Initialization ---
