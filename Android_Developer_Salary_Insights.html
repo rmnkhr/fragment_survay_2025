@@ -1,0 +1,1400 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Портрет Android-розробника 2025</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+  <style>
+    :root {
+      --bg-color: #ffffff;
+      --text-color: #333333;
+      --card-bg: #f5f5f5;
+      --card-border: #e0e0e0;
+      --accent-color: #4285f4; /* Google Blue */
+      --accent-color-darker: #3367d6;
+      --chart-grid: #e0e0e0;
+      --error-color: #e53935;
+      --success-color: #43a047; /* Green for satisfaction */
+      --warning-color: #fdd835; /* Yellow for partial satisfaction/dissatisfaction */
+      --palette-1: #4285f4; /* Blue */
+      --palette-2: #ea4335; /* Red */
+      --palette-3: #fbbc05; /* Yellow */
+      --palette-4: #34a853; /* Green */
+      --palette-5: #ff6d00; /* Orange */
+      --palette-6: #1a73e8; /* Darker Blue */
+    }
+    
+    [data-theme="dark"] {
+      --bg-color: #121212;
+      --text-color: #f0f0f0;
+      --card-bg: #1e1e1e;
+      --card-border: #333333;
+      --accent-color: #8ab4f8; /* Lighter Blue */
+      --accent-color-darker: #aecbfa;
+      --chart-grid: #444444;
+      --error-color: #ff6b6b;
+      --success-color: #81c784; /* Lighter Green */
+      --warning-color: #fff176; /* Lighter Yellow */
+      --palette-1: #8ab4f8; /* Lighter Blue */
+      --palette-2: #f28b82; /* Lighter Red */
+      --palette-3: #fdd663; /* Lighter Yellow */
+      --palette-4: #81c784; /* Lighter Green */
+      --palette-5: #fdab67; /* Lighter Orange */
+      --palette-6: #aecbfa; /* Lighter Darker Blue */
+    }
+    
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      font-family: 'Segoe UI', 'Roboto', Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      transition: background-color 0.3s ease, color 0.3s ease;
+      line-height: 1.6;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+    
+    header {
+      text-align: center;
+      margin-bottom: 3rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 3px solid var(--accent-color);
+    }
+    
+    h1 {
+      font-size: 2.8rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: var(--accent-color);
+    }
+    
+    .subtitle {
+      font-size: 1.3rem;
+      opacity: 0.8;
+      margin-bottom: 1rem;
+    }
+    
+    .theme-toggle {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      padding: 0.6rem 1.2rem;
+      background: var(--accent-color);
+      color: white; /* Always white for better contrast on button */
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.3s ease, transform 0.2s ease;
+      font-size: 0.9rem;
+      z-index: 1000;
+    }
+    
+    .theme-toggle:hover {
+      background-color: var(--accent-color-darker);
+      transform: scale(1.05);
+    }
+
+    .loading {
+      display: none; /* Initially hidden, shown during processing */
+      text-align: center;
+      margin: 3rem 0;
+      font-size: 1.2rem;
+    }
+    
+    .spinner {
+      display: inline-block;
+      width: 50px;
+      height: 50px;
+      border: 5px solid var(--card-bg);
+      border-top: 5px solid var(--accent-color);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 1rem;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .error-message {
+      display: none;
+      background-color: var(--error-color);
+      color: white;
+      padding: 1.2rem;
+      border-radius: 8px;
+      margin: 2rem 0;
+      text-align: center;
+      font-weight: 500;
+    }
+    
+    .dashboard {
+      display: grid;
+      /* Use auto-fit to make it responsive */
+      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+      gap: 1.8rem;
+      opacity: 0; /* Start hidden */
+      transition: opacity 0.5s ease-in-out;
+    }
+
+    .dashboard.visible {
+        opacity: 1;
+    }
+    
+    .card {
+      background-color: var(--card-bg);
+      border-radius: 12px;
+      padding: 1.8rem;
+      box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+      border: 1px solid var(--card-border);
+      display: flex;
+      flex-direction: column;
+    }
+    
+    .card:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
+    }
+    
+    .card h2 {
+        font-size: 1.4rem;
+        margin-top: 0;
+        margin-bottom: 1.5rem;
+        color: var(--accent-color);
+        border-bottom: 1px solid var(--card-border);
+        padding-bottom: 0.8rem;
+    }
+    
+    /* Specific card spanning */
+     .card-full {
+        grid-column: 1 / -1; /* Span full width */
+    }
+
+    @media (min-width: 1100px) { /* Adjust breakpoint as needed */
+      .card-span-2 {
+        grid-column: span 2;
+      }
+    }
+
+    .chart-container {
+      position: relative;
+      height: 300px; /* Default height */
+      width: 100%;
+      margin-bottom: 1rem;
+      flex-grow: 1; /* Allow chart container to grow */
+    }
+
+    .correlation-chart-container {
+        height: 350px;
+    }
+    
+    .insights {
+      margin-top: 1.5rem;
+      padding-top: 1rem;
+      border-top: 1px dashed var(--card-border);
+    }
+    
+    .insights-title {
+      color: var(--accent-color);
+      margin-bottom: 0.8rem;
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+    
+    .insights-list {
+      list-style-type: none;
+      padding-left: 0;
+      margin: 0;
+      font-size: 0.95rem;
+    }
+    
+    .insights-list li {
+      margin-bottom: 0.6rem;
+      display: flex;
+      align-items: flex-start; /* Align icon with first line */
+    }
+    
+    .insights-list li::before {
+      content: "💡"; /* Using an emoji */
+      margin-right: 0.6rem;
+      font-size: 1rem;
+      line-height: 1.4; /* Align emoji better */
+    }
+    
+    footer {
+      margin-top: 3rem;
+      text-align: center;
+      font-size: 0.9rem;
+      opacity: 0.7;
+      padding-top: 1.5rem;
+      border-top: 1px solid var(--card-border);
+    }
+    
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+      .dashboard {
+        grid-template-columns: 1fr; /* Single column on smaller screens */
+      }
+       .card-full, .card-span-2 {
+        grid-column: span 1; /* Override spanning on small screens */
+      }
+      .container {
+        padding: 1rem;
+      }
+      h1 {
+          font-size: 2.2rem;
+      }
+      .subtitle {
+          font-size: 1.1rem;
+      }
+      .card {
+          padding: 1.2rem;
+      }
+      .card h2 {
+          font-size: 1.2rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <button class="theme-toggle" onclick="toggleTheme()">🌓 Змінити тему</button>
+  
+  <div class="container">
+    <header>
+      <h1>Портрет Android-розробника 2025</h1>
+      <p class="subtitle">Аналіз статистичних даних з опитування українських розробників</p>
+      <p><span id="respondentCount">--</span> респондентів</p>
+    </header>
+        
+    <div class="error-message" id="errorMessage"></div>
+    
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+      <p>Аналізуємо дані опитування...</p>
+    </div>
+    
+    <div class="dashboard" id="dashboard">
+      <!-- Row 1 -->
+      <div class="card">
+        <h2>Розподіл за досвідом</h2>
+        <div class="chart-container">
+          <canvas id="experienceChart"></canvas>
+        </div>
+        <div class="insights">
+          <h3 class="insights-title">Ключові моменти</h3>
+          <ul class="insights-list" id="experienceInsights"></ul>
+        </div>
+      </div>
+      
+      <div class="card">
+        <h2>Розподіл зарплат ($)</h2>
+        <div class="chart-container">
+          <canvas id="salaryChart"></canvas>
+        </div>
+        <div class="insights">
+          <h3 class="insights-title">Ключові моменти</h3>
+          <ul class="insights-list" id="salaryInsights"></ul>
+        </div>
+      </div>
+
+      <!-- Row 2 -->
+      <div class="card card-full">
+        <h2>Залежність Медіанної Зарплати від Досвіду</h2>
+        <div class="chart-container correlation-chart-container">
+          <canvas id="correlationChart"></canvas>
+        </div>
+        <div class="insights">
+          <h3 class="insights-title">Ключові моменти</h3>
+          <ul class="insights-list" id="correlationInsights"></ul>
+        </div>
+      </div>
+      
+      <!-- Row 3 -->
+      <div class="card">
+        <h2>Популярні UI Технології</h2>
+        <div class="chart-container">
+          <canvas id="techChart"></canvas>
+        </div>
+        <div class="insights">
+          <h3 class="insights-title">Ключові моменти</h3>
+          <ul class="insights-list" id="techInsights"></ul>
+        </div>
+      </div>
+
+      <div class="card">
+          <h2>Задоволеність Роботою/ЗП</h2>
+          <div class="chart-container">
+            <canvas id="satisfactionChart"></canvas>
+          </div>
+          <div class="insights">
+              <h3 class="insights-title">Ключові моменти</h3>
+              <ul class="insights-list" id="satisfactionInsights"></ul>
+          </div>
+      </div>
+
+       <!-- Row 4 -->
+      <div class="card">
+          <h2>Сфери Роботи</h2>
+          <div class="chart-container">
+              <canvas id="workSphereChart"></canvas>
+          </div>
+          <div class="insights">
+              <h3 class="insights-title">Ключові моменти</h3>
+              <ul class="insights-list" id="workSphereInsights"></ul>
+          </div>
+      </div>
+      
+      <div class="card">
+          <h2>OS для розробки</h2>
+          <div class="chart-container">
+              <canvas id="osChart"></canvas>
+          </div>
+          <div class="insights">
+              <h3 class="insights-title">Ключові моменти</h3>
+              <ul class="insights-list" id="osInsights"></ul>
+          </div>
+      </div>
+
+      <!-- Row 5 -->
+       <div class="card">
+        <h2>Використання ШІ</h2>
+        <div class="chart-container">
+          <canvas id="aiUsageChart"></canvas>
+        </div>
+        <div class="insights">
+          <h3 class="insights-title">Ключові моменти</h3>
+          <ul class="insights-list" id="aiUsageInsights"></ul>
+        </div>
+      </div>
+      
+      <div class="card">
+        <h2>Основний Девайс</h2>
+        <div class="chart-container">
+          <canvas id="deviceChart"></canvas>
+        </div>
+        <div class="insights">
+          <h3 class="insights-title">Ключові моменти</h3>
+          <ul class="insights-list" id="deviceInsights"></ul>
+        </div>
+      </div>
+
+      <!-- Row 6 -->
+      <div class="card card-full">
+        <h2>Як Навчалися Кодити</h2>
+        <div class="chart-container" style="height: 350px;"> <!-- Taller for potentially many bars -->
+          <canvas id="learningMethodChart"></canvas>
+        </div>
+        <div class="insights">
+          <h3 class="insights-title">Ключові моменти</h3>
+          <ul class="insights-list" id="learningMethodInsights"></ul>
+        </div>
+      </div>
+
+    </div> <!-- End Dashboard -->
+    
+    <footer>
+      <p>© 2025 Опитування Android-розробників | Аналіз даних станом на квітень 2025</p>
+    </footer>
+  </div>
+
+  <!-- Embed CSV Data -->
+  <script id="csvDataScript" type="text/csv">
+Timestamp,Досвід,У якій сфері ти працюєш?,З цим працюємо зараз (В основному або більшість часу),Питання про гроші (В долярах),OS для розробки,Штучка інтелект,Чи задоволений ти своєю зарплатою і компанією зараз?,Як ви навчилися кодити?,Мій основний девайс
+04/04/2025 18:25:28,8+ роки,Продукт,Jetpack Compose,>10_000,MacOS,Багато користуюся,Так,Універ,
+04/04/2025 18:41:24,1..2 роки,Продукт,Jetpack Compose,<=3_000,MacOS,Весь час ним користуюся,Так,"Сам, Курси, Відео туторіали в Youtube",Android смартфон
+04/04/2025 18:41:55,> 0 роки,Аутсорс,Jetpack Compose,<=1_000,Windown,Весь час ним користуюся,"Ні, не подобається зп","Сам, Курси, Універ, Відео туторіали в Youtube",Android смартфон
+04/04/2025 18:42:03,5..7 роки,Продукт,Jetpack Compose,<=10_000,MacOS,Весь час ним користуюся,Так,"Сам, Курси, Відео туторіали в Youtube",IPhone
+04/04/2025 18:42:09,5..7 роки,Продукт,Jetpack Compose,<=5_000,MacOS,Трохи користуюся,"Ні, не подобається зп","Сам, Універ, Відео туторіали в Youtube",IPhone
+04/04/2025 18:42:34,3..5 роки,Продукт,XML + Compose,<=3_000,MacOS,Весь час ним користуюся,"Ні, не подобається зп","Сам, Універ, Відео туторіали в Youtube",Android смартфон
+04/04/2025 18:43:02,> 0 роки,Вчуся/Шукаю роботу,Kotlin Multiplatform (KMP),<=500,MacOS,Весь час ним користуюся,"Ні, не подобається робота, яку роблю","Сам, Відео туторіали в Youtube",Android смартфон
+04/04/2025 18:43:26,> 0 роки,Продукт,Kotlin Multiplatform (KMP),<=1_000,MacOS,Трохи користуюся,Так,"Сам, Універ, Відео туторіали в Youtube",Android смартфон
+04/04/2025 18:43:58,1..2 роки,Аутсорс,Jetpack Compose,<=3_000,MacOS,Весь час ним користуюся,Так,"Сам, Відео туторіали в Youtube",Android смартфон
+04/04/2025 18:44:06,8+ роки,Аутсорс,XML UI,<=5_000,MacOS,Весь час ним користуюся,Так,"Сам, Універ, Відео туторіали в Youtube",Android смартфон
+04/04/2025 18:44:22,8+ роки,Продукт,XML UI,<=10_000,MacOS,Хейтер,Так,Сам,Android смартфон
+04/04/2025 18:45:19,1..2 роки,Продукт,Jetpack Compose,<=500,MacOS,Багато користуюся,"Ні, не подобається зп","Сам, Курси, Універ, Відео туторіали в Youtube",Android смартфон
+04/04/2025 18:45:48,> 0 роки,Аутсорс,Jetpack Compose,<=1_000,Windown,Весь час ним користуюся,"Ні, не подобається робота, яку роблю","Сам, Курси, Універ",Android смартфон
+04/04/2025 18:46:15,8+ роки,Продукт,Jetpack Compose,<=10_000,MacOS,Трохи користуюся,Так,"Сам, Курси, Універ, Відео туторіали в Youtube",Android смартфон
+04/04/2025 18:47:07,5..7 роки,Продукт,XML UI,<=5_000,MacOS,Багато користуюся,"Ні, не подобається зп","Сам, Курси",IPhone
+04/04/2025 18:49:57,8+ роки,Продукт,Jetpack Compose,<=5_000,MacOS,Трохи користуюся,"Ні, не подобається зп","Сам, Універ",Android смартфон
+04/04/2025 19:03:24,3..5 роки,Аутсорс,Jetpack Compose,<=3_000,MacOS,Багато користуюся,Так,"Сам, Відео туторіали в Youtube",Android смартфон
+04/04/2025 19:07:12,Не маю комерційного досвіду,Вчуся/Шукаю роботу,XML UI,0$ (Вчуся/безкоштовно),Linux,Багато користуюся,"Ні, не подобається зп","Сам, Відео туторіали в Youtube",Android смартфон
+04/04/2025 19:08:41,5..7 роки,Продукт,Jetpack Compose,<=5_000,MacOS,Трохи користуюся,"Ні, не подобається зп","Сам, Відео туторіали в Youtube, люди, яких зустрів на локальних подіях по Андроід",IPhone
+04/04/2025 19:12:47,1..2 роки,Аутсорс,XML UI,<=1_000,Windown,Багато користуюся,"Ні, не подобаєтсья робота і не подобається зарплата","Сам, Універ, Відео туторіали в Youtube",Android смартфон
+04/04/2025 19:14:10,3..5 роки,Аутсорс,Jetpack Compose,<=5_000,Windown,Багато користуюся,Так,"Сам, Курси, Відео туторіали в Youtube",Android смартфон
+04/04/2025 19:16:01,2..3 роки,Продукт,XML UI,<=10_000,MacOS,Трохи користуюся,"Ні, не подобаєтсья робота і не подобається зарплата","Сам, Універ, Відео туторіали в Youtube",Android смартфон
+04/04/2025 19:17:32,5..7 роки,Продукт,XML UI,<=5_000,MacOS,Багато користуюся,Так,Сам,Android смартфон
+04/04/2025 19:19:30,5..7 роки,Продукт,Jetpack Compose,<=10_000,MacOS,Багато користуюся,Так,Сам,Android смартфон
+04/04/2025 19:37:18,8+ роки,Продукт,Jetpack Compose,<=10_000,MacOS,Багато користуюся,Так,"Сам, Курси, Відео туторіали в Youtube",Android смартфон
+04/04/2025 19:40:33,Не маю комерційного досвіду,Вчуся/Шукаю роботу,Jetpack Compose,0$ (Вчуся/безкоштовно),Windown,Весь час ним користуюся,"Ні, не подобається робота, яку роблю","Сам, Відео туторіали в Youtube",IPhone
+04/04/2025 19:41:00,2..3 роки,Продукт,"C++, Java",<=10_000,Windown,Багато користуюся,Так,"Курси, Універ, Відео туторіали в Youtube",Android смартфон
+04/04/2025 19:51:05,3..5 роки,Аутсорс,Jetpack Compose,<=3_000,MacOS,Багато користуюся,Так,"Сам, Відео туторіали в Youtube",Android смартфон
+04/04/2025 20:16:53,2..3 роки,Продукт,Jetpack Compose,<=3_000,MacOS,Багато користуюся,Так,Курси,IPhone
+04/04/2025 20:37:18,Не маю комерційного досвіду,Вчуся/Шукаю роботу,Jetpack Compose,0$ (Вчуся/безкоштовно),Linux,Трохи користуюся,"Ні, не подобається зп",Універ,Android смартфон
+04/04/2025 20:39:42,2..3 роки,Продукт,XML UI,<=3_000,MacOS,Трохи користуюся,"Ні, не подобаєтсья робота і не подобається зарплата",Сам,Android смартфон
+04/04/2025 21:20:06,5..7 роки,Продукт,Jetpack Compose,<=5_000,Linux,Трохи користуюся,"Ні, не подобається зп","Сам, Універ, Відео туторіали в Youtube",Android смартфон
+04/04/2025 21:42:56,8+ роки,Аутсорс,Jetpack Compose,<=5_000,MacOS,Трохи користуюся,Так,"Сам, Універ, Відео туторіали в Youtube",Android смартфон
+04/04/2025 21:49:58,3..5 роки,Продукт,Jetpack Compose,<=5_000,MacOS,Весь час ним користуюся,"Ні, не подобається зп","Сам, Універ, Відео туторіали в Youtube",IPhone
+04/04/2025 22:28:33,8+ роки,Аутсорс,"JetpackCompose, Swift",<=10_000,MacOS,Багато користуюся,Так,"Сам, Універ, Articles",IPhone
+04/04/2025 23:07:31,5..7 роки,Фріланс,Jetpack Compose,<=5_000,MacOS,Багато користуюся,Так,"Сам, Універ",Android смартфон
+04/04/2025 23:09:49,5..7 роки,Аутсорс,XML UI,<=5_000,Linux,Багато користуюся,Так,"Сам, Курси",IPhone
+04/04/2025 23:13:36,> 0 роки,Аутсорс,XML UI,<=500,Linux,Багато користуюся,"Ні, не подобається зп","Сам, Курси, Універ, Відео туторіали в Youtube",Android смартфон
+04/04/2025 23:17:29,Не маю комерційного досвіду,Вчуся/Шукаю роботу,Jetpack Compose,0$ (Вчуся/безкоштовно),Linux,Трохи користуюся,"Ні, не подобаєтсья робота і не подобається зарплата","Сам, Курси, Відео туторіали в Youtube",Android смартфон
+04/04/2025 23:20:54,3..5 роки,Продукт,XML UI,<=3_000,Windown,Багато користуюся,"Ні, не подобається зп","Сам, Курси, Відео туторіали в Youtube",Android смартфон
+04/04/2025 23:36:05,5..7 роки,Аутсорс,Jetpack Compose,<=5_000,Windown,Багато користуюся,Так,Універ,Android смартфон
+05/04/2025 00:43:25,3..5 роки,Продукт,Jetpack Compose,<=5_000,MacOS,Багато користуюся,"Ні, не подобається зп","Сам, Відео туторіали в Youtube",Android смартфон
+05/04/2025 00:46:02,Не маю комерційного досвіду,Вчуся/Шукаю роботу,Jetpack Compose,0$ (Вчуся/безкоштовно),MacOS,Багато користуюся,Так,"Сам, Курси, Відео туторіали в Youtube",Android смартфон
+05/04/2025 00:48:00,8+ роки,Продукт,Flutter,<=5_000,MacOS,Весь час ним користуюся,"Ні, не подобається зп","Сам, Універ",IPhone
+05/04/2025 00:51:52,3..5 роки,Продукт,Jetpack Compose,<=3_000,MacOS,Багато користуюся,"Ні, не подобається зп","Курси, Універ, Відео туторіали в Youtube",Android смартфон
+05/04/2025 01:12:21,3..5 роки,Продукт,Jetpack Compose,<=3_000,MacOS,Трохи користуюся,"Ні, не подобаєтсья робота і не подобається зарплата","Сам, Універ, Відео туторіали в Youtube",Android смартфон
+05/04/2025 01:15:34,2..3 роки,Продукт,Swift,<=3_000,MacOS,Весь час ним користуюся,Так,"Сам, Курси, Відео туторіали в Youtube",IPhone
+05/04/2025 01:44:41,3..5 роки,Продукт,XML UI,<=1_000,Windown,Весь час ним користуюся,"Ні, не подобається зп","Сам, Курси",IPhone
+05/04/2025 02:11:53,2..3 роки,Аутсорс,XML UI,<=3_000,MacOS,Трохи користуюся,"Ні, не подобається зп","Сам, Універ, Відео туторіали в Youtube",Android смартфон
+05/04/2025 02:13:41,1..2 роки,Продукт,Jetpack Compose,<=1_000,MacOS,Багато користуюся,"Ні, не подобається робота, яку роблю","Сам, Курси, Універ, Відео туторіали в Youtube",Android смартфон
+05/04/2025 02:42:07,8+ роки,Аутсорс,XML UI,<=10_000,Linux,Багато користуюся,"Ні, не подобаєтсья робота і не подобається зарплата",Сам,Android смартфон
+05/04/2025 03:49:40,5..7 роки,Продукт,Jetpack Compose,<=10_000,MacOS,Трохи користуюся,Так,"Сам, Універ",Android смартфон
+05/04/2025 04:20:27,1..2 роки,Вчуся/Шукаю роботу,Jetpack Compose,<=3_000,MacOS,Трохи користуюся,"Ні, не подобаєтсья робота і не подобається зарплата","Сам, Універ, Відео туторіали в Youtube",IPhone
+05/04/2025 05:54:40,3..5 роки,Аутсорс,Kotlin Multiplatform (KMP),<=10_000,MacOS,Хейтер,"Ні, не подобається зп",Відео туторіали в Youtube,IPhone
+05/04/2025 08:15:48,3..5 роки,Продукт,Jetpack Compose,<=5_000,Linux,Весь час ним користуюся,Так,Сам,IPhone
+05/04/2025 08:21:14,> 0 роки,Indie-розробник,Jetpack Compose,0$ (Вчуся/безкоштовно),Windown,Весь час ним користуюся,Так,Сам,Android смартфон
+05/04/2025 10:15:14,3..5 роки,Продукт,"Юніт-інтегрований код, ТДД",<=5_000,MacOS,Багато користуюся,"Ні, не подобається зп","Сам, Універ, Відео туторіали в Youtube",Android смартфон
+05/04/2025 10:57:33,5..7 роки,Продукт,Jetpack Compose,<=3_000,MacOS,Багато користуюся,"Ні, не подобається зп",Сам,IPhone
+05/04/2025 12:50:20,3..5 роки,Аутсорс,Kotlin Multiplatform (KMP),<=5_000,MacOS,Весь час ним користуюся,Так,"Сам, Курси, Відео туторіали в Youtube",IPhone
+05/04/2025 13:26:42,Не маю комерційного досвіду,Вчуся/Шукаю роботу,"Jetpack Compose, XML UI",0$ (Вчуся/безкоштовно),Windown,Багато користуюся,"Ні, не подобається зп","Сам, Курси, Універ, Література",Android смартфон
+05/04/2025 14:38:53,8+ роки,Продукт,Kotlin Multiplatform (KMP),0$ (Вчуся/безкоштовно),MacOS,Трохи користуюся,Так,"Сам, Курси, Відео туторіали в Youtube",Android смартфон
+05/04/2025 15:48:28,5..7 роки,Аутсорс,Jetpack Compose,<=5_000,MacOS,Багато користуюся,Так,"Сам, Відео туторіали в Youtube",Android смартфон
+05/04/2025 21:42:42,1..2 роки,Аутсорс,XML UI,<=500,Windown,Трохи користуюся,"Ні, не подобаєтсья робота і не подобається зарплата","Сам, Універ",Android смартфон
+06/04/2025 01:23:29,2..3 роки,Продукт,Jetpack Compose,<=3_000,MacOS,Трохи користуюся,"Ні, не подобається зп","Сам, Курси, Універ",IPhone
+06/04/2025 01:58:03,2..3 роки,Продукт,Blockchain ,<=3_000,Linux,Трохи користуюся,"Ні, не подобається зп",Сам,Android смартфон
+06/04/2025 09:11:10,Не маю комерційного досвіду,Вчуся/Шукаю роботу,Jetpack Compose,0$ (Вчуся/безкоштовно),Linux,Багато користуюся,"Ні, не подобається зп","Сам, Відео туторіали в Youtube",Android смартфон
+06/04/2025 19:20:07,Не маю комерційного досвіду,Вчуся/Шукаю роботу,Jetpack Compose,0$ (Вчуся/безкоштовно),Linux,Весь час ним користуюся,Так,"Сам, Курси, Універ",IPhone
+06/04/2025 21:31:34,5..7 роки,Продукт,XML UI,<=3_000,MacOS,Трохи користуюся,"Ні, не подобаєтсья робота і не подобається зарплата","Сам, Відео туторіали в Youtube",Android смартфон
+06/04/2025 21:42:18,5..7 роки,Продукт,Jetpack Compose,<=5_000,MacOS,Трохи користуюся,"Ні, не подобаєтсья робота і не подобається зарплата",Сам,IPhone
+07/04/2025 09:03:13,2..3 роки,Аутсорс,XML UI,<=3_000,MacOS,Весь час ним користуюся,"Ні, не подобається зп","Сам, Відео туторіали в Youtube",Android смартфон
+07/04/2025 11:02:46,1..2 роки,Аутсорс,Jetpack Compose,<=3_000,MacOS,Багато користуюся,Так,"Сам, Курси, Відео туторіали в Youtube",Android смартфон
+07/04/2025 11:04:54,1..2 роки,Продукт,Jetpack Compose,<=1_000,Windown,Багато користуюся,"Ні, не подобається робота, яку роблю","Сам, Універ, Відео туторіали в Youtube",Android смартфон
+07/04/2025 11:18:17,> 0 роки,Вчуся/Шукаю роботу,Jetpack Compose,0$ (Вчуся/безкоштовно),Windown,Трохи користуюся,Так,Сам,IPhone
+07/04/2025 11:48:51,> 0 роки,Аутсорс,Jetpack Compose,<=1_000,MacOS,Багато користуюся,Так,"Сам, Відео туторіали в Youtube",Android смартфон
+07/04/2025 11:58:23,3..5 роки,Продукт,Jetpack Compose,<=3_000,Linux,Трохи користуюся,"Ні, не подобається зп","Сам, Універ, мала ментора",IPhone
+</script>
+
+  <script>
+    // --- Global Variables ---
+    let surveyData = [];
+    let charts = {};
+    const COLUMN_MAPPING = {
+        TIMESTAMP: 'Timestamp',
+        EXPERIENCE: 'Досвід',
+        WORK_SPHERE: 'У якій сфері ти працюєш?',
+        TECHNOLOGY: 'З цим працюємо зараз (В основному або більшість часу)',
+        SALARY: 'Питання про гроші (В долярах)',
+        OS: 'OS для розробки',
+        AI_USAGE: 'Штучка інтелект',
+        SATISFACTION: 'Чи задоволений ти своєю зарплатою і компанією зараз?',
+        LEARNING: 'Як ви навчилися кодити?',
+        DEVICE: 'Мій основний девайс'
+    };
+
+    // --- Theme Handling ---
+    function applyTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        updateChartColors();
+    }
+
+    function toggleTheme() {
+        const currentTheme = document.documentElement.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        applyTheme(newTheme);
+        localStorage.setItem('theme', newTheme); // Save preference
+    }
+
+    function updateChartColors() {
+        const computedStyle = getComputedStyle(document.documentElement);
+        const textColor = computedStyle.getPropertyValue('--text-color');
+        const gridColor = computedStyle.getPropertyValue('--chart-grid');
+        const palette = [
+            computedStyle.getPropertyValue('--palette-1'),
+            computedStyle.getPropertyValue('--palette-2'),
+            computedStyle.getPropertyValue('--palette-3'),
+            computedStyle.getPropertyValue('--palette-4'),
+            computedStyle.getPropertyValue('--palette-5'),
+            computedStyle.getPropertyValue('--palette-6'),
+        ];
+        const satisfactionColors = [
+            computedStyle.getPropertyValue('--success-color'), // Так
+            computedStyle.getPropertyValue('--warning-color'), // Ні, ЗП
+            computedStyle.getPropertyValue('--error-color'),   // Ні, робота
+            computedStyle.getPropertyValue('--error-color'),   // Ні, обидва (use same as 'job' or a distinct one)
+             gridColor // Не вказано
+        ];
+
+        Chart.defaults.color = textColor;
+        Chart.defaults.borderColor = gridColor;
+
+        Object.values(charts).forEach(chart => {
+            if (chart) {
+                // --- ПОЧАТОК ВИПРАВЛЕННЯ ---
+                // Оновлюємо кольори тільки якщо осі існують
+                if (chart.options.scales && chart.options.scales.x) {
+                    chart.options.scales.x.grid.color = gridColor;
+                    chart.options.scales.x.ticks.color = textColor;
+                }
+                if (chart.options.scales && chart.options.scales.y) {
+                    chart.options.scales.y.grid.color = gridColor;
+                    chart.options.scales.y.ticks.color = textColor;
+                }
+                // --- КІНЕЦЬ ВИПРАВЛЕННЯ ---
+
+                // Оновлення кольору легенди (це безпечно, бо plugin.legend існує)
+                if (chart.options.plugins && chart.options.plugins.legend && chart.options.plugins.legend.labels) {
+                   chart.options.plugins.legend.labels.color = textColor;
+                }
+
+
+                 // Apply specific palettes
+                 if (chart.canvas.id === 'satisfactionChart') {
+                    // Потрібно переконатись що datasets існує
+                    if (chart.data.datasets && chart.data.datasets.length > 0) {
+                         const satLabels = chart.data.labels;
+                         const backgroundColors = satLabels.map(label => {
+                            if (label.includes('Задоволений')) return satisfactionColors[0];
+                            if (label.includes('(ЗП)')) return satisfactionColors[1];
+                            if (label.includes('(Робота та ЗП)')) return satisfactionColors[3]; // Both
+                            if (label.includes('(Робота)')) return satisfactionColors[2];
+                            return satisfactionColors[4]; // Default/Не вказано
+                         });
+                        chart.data.datasets[0].backgroundColor = backgroundColors;
+                    }
+                } else if (chart.config.type === 'pie' || chart.config.type === 'doughnut') {
+                     // Потрібно переконатись що datasets існує
+                     if (chart.data.datasets && chart.data.datasets.length > 0) {
+                        chart.data.datasets[0].backgroundColor = palette;
+                     }
+                 } else if (chart.data.datasets && chart.data.datasets.length > 0){
+                     chart.data.datasets[0].backgroundColor = palette[0]; // Default bar/line color
+                     chart.data.datasets[0].borderColor = palette[0];
+                 }
+
+                chart.update();
+            }
+        });
+    }
+
+     // --- Utility Functions ---
+     function addInsight(listElement, text) {
+        if (!text) return;
+        const li = document.createElement('li');
+        li.textContent = text;
+        listElement.appendChild(li);
+     }
+
+     function showError(message) {
+        const errorElement = document.getElementById('errorMessage');
+        errorElement.textContent = "Помилка: " + message;
+        errorElement.style.display = 'block';
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('dashboard').style.display = 'none'; // Hide dashboard on error
+     }
+
+     function hideError() {
+        document.getElementById('errorMessage').style.display = 'none';
+     }
+
+     // --- Data Parsing Functions ---
+
+     // Parses experience string like "1..2 роки", "8+ роки", "> 0 роки" into a numerical representation (mid-point or boundary).
+     function parseExperience(expStr) {
+        if (!expStr || typeof expStr !== 'string') return null;
+        expStr = expStr.toLowerCase().trim();
+
+        if (expStr.includes('не маю') || expStr === '0') return 0;
+        if (expStr.includes('> 0') || expStr.includes('< 1')) return 0.5; // Treat <1 year as 0.5
+        if (expStr.includes('..')) {
+            const parts = expStr.match(/(\d+)\.\.(\d+)/);
+            if (parts) return (parseInt(parts[1]) + parseInt(parts[2])) / 2;
+        }
+        if (expStr.includes('+')) {
+             const parts = expStr.match(/(\d+)\+/);
+             if (parts) return parseInt(parts[1]); // Represent 8+ as 8 for grouping/lower bound
+        }
+         // Try parsing a simple number
+         const num = parseFloat(expStr);
+         if (!isNaN(num)) return num;
+
+        return null; // Can't parse
+     }
+
+      // Parses salary string like "<=3_000", ">10_000", "0$" into a numerical value.
+      // We'll use the boundary value for simplicity in ranges.
+      function parseSalary(salaryStr) {
+         if (salaryStr === null || salaryStr === undefined) return null;
+         if (typeof salaryStr === 'number') return salaryStr; // Already a number
+         if (typeof salaryStr !== 'string') return null;
+
+         salaryStr = salaryStr.trim().replace(/[\s_$]/g, '').replace(',', ''); // Clean up
+
+         if (salaryStr.toLowerCase().includes('вчуся') || salaryStr === '0') return 0;
+
+         if (salaryStr.startsWith('<=')) {
+             return parseInt(salaryStr.substring(2)) || null;
+         }
+         if (salaryStr.startsWith('>')) {
+             // Represent ">10000" as slightly above, e.g., 10001, or just 10000 for grouping
+             return parseInt(salaryStr.substring(1)) + 1 || null;
+         }
+         // Try direct parse if it's just a number
+         const num = parseInt(salaryStr);
+         return !isNaN(num) ? num : null;
+     }
+
+     // Parses technology string, splits by common delimiters, trims, normalizes.
+    function parseTechnologies(techStr) {
+        if (!techStr || typeof techStr !== 'string') return [];
+        // Normalize common names first
+        techStr = techStr.replace(/JetpackCompose/gi, 'Jetpack Compose')
+                         .replace(/XML UI/gi, 'XML')
+                         .replace(/Kotlin Multiplatform \(KMP\)/gi, 'KMP');
+
+        // Split by comma, semicolon, plus, space (if next char is capital or XML/Compose)
+        const techs = techStr.split(/[,;+]|\s+(?=XML|Compose)/)
+            .map(t => t.trim())
+            .filter(t => t.length > 0); // Remove empty strings
+
+        // Handle cases like "XML + Compose" specifically if not split above
+        const finalTechs = [];
+        techs.forEach(tech => {
+            if (tech === 'XML + Compose') { // Example explicit handling if needed
+                finalTechs.push('XML', 'Jetpack Compose');
+            } else {
+                finalTechs.push(tech);
+            }
+        });
+
+         // Filter out less specific terms if desired (optional)
+         return finalTechs.filter(t => !['Юніт-інтегрований код', 'ТДД', 'Articles'].includes(t));
+     }
+
+     // Normalizes OS names
+     function normalizeOS(osStr) {
+         if (!osStr || typeof osStr !== 'string') return 'Не вказано';
+         const lowerOS = osStr.toLowerCase().trim();
+         if (lowerOS.startsWith('mac') || lowerOS.startsWith('macos')) return 'MacOS';
+         if (lowerOS.startsWith('win') || lowerOS.startsWith('windown')) return 'Windows'; // Fix typo
+         if (lowerOS.startsWith('lin')) return 'Linux';
+         return 'Інше';
+     }
+
+     // Categorizes satisfaction responses
+    function parseSatisfaction(satStr) {
+        if (!satStr || typeof satStr !== 'string') return 'Не вказано';
+        const lowerSat = satStr.toLowerCase();
+        if (lowerSat === 'так') return 'Задоволений(а)';
+        if (lowerSat.includes('не подобаєтсья робота і не подобається зарплата')) return 'Незадоволений(а) (Робота та ЗП)';
+        if (lowerSat.includes('зп') || lowerSat.includes('зарплат')) return 'Незадоволений(а) (ЗП)';
+        if (lowerSat.includes('робот')) return 'Незадоволений(а) (Робота)';
+        return 'Не вказано'; // Fallback
+     }
+
+     // Parses learning methods string
+     function parseLearningMethods(learnStr) {
+         if (!learnStr || typeof learnStr !== 'string') return [];
+         return learnStr.split(',')
+                .map(m => m.trim().replace(/^Сам$/i, 'Самостійно') // Normalize "Сам"
+                           .replace(/Відео туторіали в Youtube/gi, 'Youtube Туторіали')
+                           .replace(/люди.*подіях.*/i, 'Нетворкінг/Події') // Simplify long entry
+                           .replace(/мала ментора/i, 'Менторство')
+                 )
+                .filter(m => m.length > 0);
+     }
+
+     // Simple device parsing
+     function parseDevice(devStr) {
+        if (!devStr || typeof devStr !== 'string') return 'Не вказано';
+        const lowerDev = devStr.toLowerCase();
+        if (lowerDev.includes('android')) return 'Android';
+        if (lowerDev.includes('iphone')) return 'iPhone';
+        return 'Інше';
+     }
+
+     // AI Usage parsing
+     function parseAIUsage(aiStr) {
+        if (!aiStr || typeof aiStr !== 'string') return 'Не вказано';
+        const lowerAI = aiStr.toLowerCase();
+        if (lowerAI.includes('весь час')) return 'Весь час';
+        if (lowerAI.includes('багато')) return 'Багато';
+        if (lowerAI.includes('трохи')) return 'Трохи';
+        if (lowerAI.includes('хейтер')) return 'Не користуюся (Хейтер)';
+        return 'Не вказано';
+     }
+
+
+    // --- Data Processing & Aggregation ---
+
+    function processSurveyData(rawData) {
+        const processed = rawData
+            .map((row, index) => {
+                // Skip empty rows (sometimes PapaParse includes them)
+                if (Object.values(row).every(val => val === null || val === '')) {
+                    return null;
+                }
+                try {
+                    const experienceNum = parseExperience(row[COLUMN_MAPPING.EXPERIENCE]);
+                    const salaryNum = parseSalary(row[COLUMN_MAPPING.SALARY]);
+
+                    // Skip rows where essential data couldn't be parsed
+                    // Allow 0 salary for learners, but null salary might indicate bad data if experience > 0
+                    if (experienceNum === null || (salaryNum === null && experienceNum > 0 && row[COLUMN_MAPPING.WORK_SPHERE] !== 'Вчуся/Шукаю роботу')) {
+                       // console.warn(`Skipping row ${index + 2}: Could not parse essential data (Exp: ${row[COLUMN_MAPPING.EXPERIENCE]}, Salary: ${row[COLUMN_MAPPING.SALARY]})`);
+                        return null;
+                    }
+
+
+                    return {
+                        experienceRaw: row[COLUMN_MAPPING.EXPERIENCE],
+                        experienceNum: experienceNum,
+                        workSphere: row[COLUMN_MAPPING.WORK_SPHERE] || 'Не вказано',
+                        technologiesRaw: row[COLUMN_MAPPING.TECHNOLOGY],
+                        technologiesParsed: parseTechnologies(row[COLUMN_MAPPING.TECHNOLOGY]),
+                        salaryRaw: row[COLUMN_MAPPING.SALARY],
+                        salaryNum: salaryNum,
+                        os: normalizeOS(row[COLUMN_MAPPING.OS]),
+                        aiUsage: parseAIUsage(row[COLUMN_MAPPING.AI_USAGE]),
+                        satisfaction: parseSatisfaction(row[COLUMN_MAPPING.SATISFACTION]),
+                        learningMethodsRaw: row[COLUMN_MAPPING.LEARNING],
+                        learningMethodsParsed: parseLearningMethods(row[COLUMN_MAPPING.LEARNING]),
+                        device: parseDevice(row[COLUMN_MAPPING.DEVICE])
+                    };
+                } catch (error) {
+                    console.error(`Error processing row ${index + 2}:`, row, error);
+                    showError(`Помилка обробки рядка ${index + 2} у CSV. Перевірте консоль.`);
+                    return null; // Skip problematic row
+                }
+            })
+            .filter(row => row !== null); // Filter out skipped rows
+
+        // Basic validation after processing
+        if (processed.length === 0 && rawData.length > 0) {
+             showError("Не вдалося обробити жодного рядка з CSV. Перевірте формат даних та відповідність колонок.");
+             return [];
+        } else if (processed.length < rawData.length * 0.5) { // Heuristic: if more than half rows skipped
+            console.warn(`Значну кількість рядків (${rawData.length - processed.length}) було пропущено під час обробки.`);
+        }
+
+        return processed;
+    }
+
+    // --- Chart Data Preparation ---
+
+    function prepareExperienceData(data) {
+        const groups = {
+             '0 років (Без досв.)': 0,
+             '0-1 рік': 0,
+             '1-2 роки': 0,
+             '2-3 роки': 0,
+             '3-5 років': 0,
+             '5-7 років': 0,
+             '7+ років': 0
+        };
+        data.forEach(row => {
+            const exp = row.experienceNum;
+            if (exp === 0 && (row.experienceRaw?.includes('Не маю') || row.workSphere === 'Вчуся/Шукаю роботу')) groups['0 років (Без досв.)']++;
+            else if (exp === 0.5) groups['0-1 рік']++; // "> 0 роки" or "< 1 рік"
+            else if (exp === 1.5) groups['1-2 роки']++;
+            else if (exp === 2.5) groups['2-3 роки']++;
+            else if (exp === 4) groups['3-5 років']++;
+            else if (exp === 6) groups['5-7 років']++;
+            else if (exp >= 7) groups['7+ років']++; // Catch 8+ explicitly mapped to 8
+        });
+         return { labels: Object.keys(groups), data: Object.values(groups) };
+    }
+
+    function prepareSalaryData(data) {
+        const groups = {
+            '0 (Навчання)': 0,
+            '1-1000': 0,
+            '1001-2000': 0,
+            '2001-3000': 0,
+            '3001-4000': 0,
+            '4001-5000': 0,
+            '5001-7000': 0,
+            '7001-10000': 0,
+            '10000+': 0
+        };
+         data.forEach(row => {
+            const salary = row.salaryNum;
+            if (salary === null) return;
+
+            if (salary === 0) groups['0 (Навчання)']++;
+            else if (salary <= 1000) groups['1-1000']++;
+            else if (salary <= 2000) groups['1001-2000']++;
+            else if (salary <= 3000) groups['2001-3000']++;
+            else if (salary <= 4000) groups['3001-4000']++;
+            else if (salary <= 5000) groups['4001-5000']++;
+             else if (salary <= 7000) groups['5001-7000']++;
+             else if (salary <= 10000) groups['7001-10000']++;
+             else groups['10000+']++;
+        });
+        // Filter out empty groups to avoid cluttering the chart
+        const filteredLabels = [];
+        const filteredData = [];
+        Object.entries(groups).forEach(([label, count]) => {
+            if (count > 0) {
+                filteredLabels.push(label);
+                filteredData.push(count);
+            }
+        });
+        return { labels: filteredLabels, data: filteredData };
+    }
+
+    function prepareTechData(data) {
+        const techCount = {};
+        data.forEach(row => {
+            row.technologiesParsed.forEach(tech => {
+                 // Further normalize similar techs if needed
+                 let normalizedTech = tech;
+                 if (tech.toLowerCase().includes('xml')) normalizedTech = 'XML';
+                 if (tech.toLowerCase().includes('compose')) normalizedTech = 'Jetpack Compose';
+                 if (tech.toLowerCase().includes('kmp')) normalizedTech = 'KMP';
+                 if (tech.toLowerCase().includes('swift')) normalizedTech = 'Swift'; // Might indicate iOS overlap
+                 if (tech.toLowerCase().includes('flutter')) normalizedTech = 'Flutter';
+                 if (tech.toLowerCase().includes('java')) normalizedTech = 'Java'; // Legacy or specific cases
+                 if (tech.toLowerCase().includes('blockchain')) normalizedTech = 'Blockchain';
+
+
+                techCount[normalizedTech] = (techCount[normalizedTech] || 0) + 1;
+            });
+        });
+
+        // Focus on core Android UI techs for the primary chart, maybe show others elsewhere
+        const coreUiTechs = ['Jetpack Compose', 'XML', 'KMP', 'Flutter']; // Add others if significant
+        const sortedUiTechs = coreUiTechs
+            .map(tech => ({ name: tech, count: techCount[tech] || 0 }))
+            .filter(item => item.count > 0) // Only show techs that actually appear
+            .sort((a, b) => b.count - a.count);
+
+        return {
+            labels: sortedUiTechs.map(item => item.name),
+            data: sortedUiTechs.map(item => item.count)
+        };
+    }
+
+     // Calculate MEDIAN salary per experience group for correlation
+     function prepareCorrelationData(data) {
+         const experienceGroups = {
+             // Using the same numerical keys as parseExperience for mapping
+             0: { expLabel: '0 (Без досв.)', salaries: [] },
+             0.5: { expLabel: '0-1 рік', salaries: [] },
+             1.5: { expLabel: '1-2 роки', salaries: [] },
+             2.5: { expLabel: '2-3 роки', salaries: [] },
+             4: { expLabel: '3-5 років', salaries: [] },
+             6: { expLabel: '5-7 років', salaries: [] },
+             8: { expLabel: '7+ років', salaries: [] }, // Represents 7+ including 8+
+         };
+
+         data.forEach(row => {
+            // Only include those with commercial experience and valid salary > 0 for this chart
+            if (row.experienceNum > 0 && row.salaryNum !== null && row.salaryNum > 0) {
+                 let groupKey = row.experienceNum;
+                 if (row.experienceNum >= 7) groupKey = 8; // Group all 7+ into the 8 key
+
+                 if (experienceGroups[groupKey]) {
+                     experienceGroups[groupKey].salaries.push(row.salaryNum);
+                 }
+             }
+         });
+
+         const correlationPoints = Object.values(experienceGroups)
+             .filter(group => group.salaries.length > 0) // Ensure group has data
+             .map(group => {
+                 group.salaries.sort((a, b) => a - b); // Sort for median calculation
+                 const mid = Math.floor(group.salaries.length / 2);
+                 const medianSalary = group.salaries.length % 2 !== 0
+                     ? group.salaries[mid]
+                     : (group.salaries[mid - 1] + group.salaries[mid]) / 2;
+                 return {
+                     x: group.expLabel, // Use the descriptive label for the axis
+                     y: Math.round(medianSalary)
+                 };
+             });
+
+             // Ensure the points are sorted by experience for the line chart
+             const expOrder = ['0 (Без досв.)', '0-1 рік', '1-2 роки', '2-3 роки', '3-5 років', '5-7 років', '7+ років'];
+             correlationPoints.sort((a, b) => expOrder.indexOf(a.x) - expOrder.indexOf(b.x));
+
+         return correlationPoints;
+     }
+
+     function prepareGenericDistributionData(data, key) {
+         const counts = {};
+         data.forEach(row => {
+             const value = row[key];
+             counts[value] = (counts[value] || 0) + 1;
+         });
+         const sortedData = Object.entries(counts)
+            .sort(([, countA], [, countB]) => countB - countA); // Sort descending by count
+
+         return {
+             labels: sortedData.map(item => item[0]),
+             data: sortedData.map(item => item[1])
+         };
+     }
+
+    function prepareLearningMethodsData(data) {
+        const methodCounts = {};
+        let totalRespondents = 0;
+        data.forEach(row => {
+            if (row.learningMethodsParsed.length > 0) {
+                totalRespondents++;
+                row.learningMethodsParsed.forEach(method => {
+                    methodCounts[method] = (methodCounts[method] || 0) + 1;
+                });
+            }
+        });
+
+        const sortedMethods = Object.entries(methodCounts)
+            .sort(([, countA], [, countB]) => countB - countA) // Sort descending
+            .slice(0, 10); // Limit to top 10 for clarity
+
+        return {
+             labels: sortedMethods.map(item => item[0]),
+             // Calculate percentage relative to respondents who answered this question
+             data: sortedMethods.map(item => Math.round((item[1] / totalRespondents) * 100))
+        };
+     }
+
+
+    // --- Insight Generation ---
+
+    function createInsights(data) {
+         const totalRespondents = data.length;
+         document.getElementById('respondentCount').textContent = totalRespondents;
+
+         const insights = {
+             experience: document.getElementById('experienceInsights'),
+             salary: document.getElementById('salaryInsights'),
+             tech: document.getElementById('techInsights'),
+             correlation: document.getElementById('correlationInsights'),
+             workSphere: document.getElementById('workSphereInsights'),
+             os: document.getElementById('osInsights'),
+             satisfaction: document.getElementById('satisfactionInsights'),
+             aiUsage: document.getElementById('aiUsageInsights'),
+             learningMethod: document.getElementById('learningMethodInsights'),
+             device: document.getElementById('deviceInsights'),
+         };
+
+         // Clear previous insights
+         Object.values(insights).forEach(el => el.innerHTML = '');
+
+         // --- Experience Insights ---
+         const experienceData = prepareExperienceData(data);
+         const mostCommonExpGroup = experienceData.labels[experienceData.data.indexOf(Math.max(...experienceData.data))];
+         addInsight(insights.experience, `Найбільш поширена група досвіду: ${mostCommonExpGroup}.`);
+         const seniorDevsPercent = Math.round((experienceData.data[experienceData.labels.indexOf('7+ років')] || 0) / totalRespondents * 100);
+         addInsight(insights.experience, `${seniorDevsPercent}% респондентів мають 7+ років досвіду.`);
+         const juniorDevsPercent = Math.round(((experienceData.data[experienceData.labels.indexOf('0 років (Без досв.)')] || 0) + (experienceData.data[experienceData.labels.indexOf('0-1 рік')] || 0)) / totalRespondents * 100);
+         addInsight(insights.experience, `${juniorDevsPercent}% мають менше 1 року комерційного досвіду або ще навчаються.`);
+
+         // --- Salary Insights ---
+         const salaryData = prepareSalaryData(data);
+         const validSalaries = data.map(r => r.salaryNum).filter(s => s !== null && s > 0); // Exclude 0/null for avg/median
+         if (validSalaries.length > 0) {
+            validSalaries.sort((a, b) => a - b);
+            const medianSalary = validSalaries.length % 2 !== 0
+                ? validSalaries[Math.floor(validSalaries.length / 2)]
+                : (validSalaries[validSalaries.length / 2 - 1] + validSalaries[validSalaries.length / 2]) / 2;
+            addInsight(insights.salary, `Медіанна зарплата (серед тих, хто вказав > 0$): $${Math.round(medianSalary)}.`);
+            const highEarnersPercent = Math.round(validSalaries.filter(s => s > 5000).length / validSalaries.length * 100);
+            addInsight(insights.salary, `${highEarnersPercent}% розробників із зарплатою заробляють понад $5000.`);
+         } else {
+             addInsight(insights.salary, "Недостатньо даних про зарплату > 0 для розрахунку медіани.");
+         }
+         const learnersCount = salaryData.data[salaryData.labels.indexOf('0 (Навчання)')] || 0;
+         addInsight(insights.salary, `${learnersCount} респондентів (${Math.round(learnersCount/totalRespondents*100)}%) вказали, що навчаються (0$).`);
+
+         // --- Tech Insights ---
+         const techData = prepareTechData(data);
+         if (techData.labels.length > 0) {
+            addInsight(insights.tech, `${techData.labels[0]} є найпопулярнішою UI технологією (${techData.data[0]} згадок).`);
+             const composeCount = techData.data[techData.labels.indexOf('Jetpack Compose')] || 0;
+             const xmlCount = techData.data[techData.labels.indexOf('XML')] || 0;
+             if (composeCount > 0 || xmlCount > 0) {
+                 const totalUiDevs = composeCount + xmlCount; // Rough estimate
+                 addInsight(insights.tech, `Jetpack Compose використовують ~${Math.round(composeCount / totalUiDevs * 100)}%, XML ~${Math.round(xmlCount / totalUiDevs * 100)}% серед тих, хто вказав одну з цих технологій.`);
+             }
+             const kmpCount = techData.data[techData.labels.indexOf('KMP')] || 0;
+             if (kmpCount > 0) {
+                addInsight(insights.tech, `Kotlin Multiplatform (KMP) згадали ${kmpCount} (${Math.round(kmpCount / totalRespondents * 100)}%) розробників.`);
+             }
+         }
+
+         // --- Correlation Insights ---
+         const correlationData = prepareCorrelationData(data);
+         if (correlationData.length >= 2) {
+             const startSalary = correlationData[0].y;
+             const endSalary = correlationData[correlationData.length - 1].y;
+             addInsight(insights.correlation, `Медіанна зарплата зростає з ~\$${startSalary} для початківців до ~\$${endSalary} для розробників з 7+ роками досвіду.`);
+             // Find the biggest jump (optional)
+             let maxJump = 0;
+             let jumpLabel = '';
+             for (let i = 1; i < correlationData.length; i++) {
+                 const jump = correlationData[i].y - correlationData[i-1].y;
+                 if (jump > maxJump) {
+                     maxJump = jump;
+                     jumpLabel = `${correlationData[i-1].x} до ${correlationData[i].x}`;
+                 }
+             }
+             if (maxJump > 0) {
+                addInsight(insights.correlation, `Найбільший стрибок у медіанній ЗП спостерігається при переході ${jumpLabel} (+\$${maxJump}).`);
+             }
+         } else {
+              addInsight(insights.correlation, "Недостатньо даних для показу чіткої кореляції зарплати та досвіду.");
+         }
+
+        // --- Work Sphere Insights ---
+        const workSphereData = prepareGenericDistributionData(data, 'workSphere');
+        if (workSphereData.labels.length > 0) {
+            const topSphere = workSphereData.labels[0];
+            const topSpherePercent = Math.round(workSphereData.data[0] / totalRespondents * 100);
+            addInsight(insights.workSphere, `Більшість (${topSpherePercent}%) працюють у сфері "${topSphere}".`);
+            const outsourcePercent = Math.round((workSphereData.data[workSphereData.labels.indexOf('Аутсорс')] || 0) / totalRespondents * 100);
+            addInsight(insights.workSphere, `${outsourcePercent}% респондентів працюють на аутсорсі.`);
+        }
+
+        // --- OS Insights ---
+        const osData = prepareGenericDistributionData(data, 'os');
+         if (osData.labels.length > 0) {
+            const topOS = osData.labels[0];
+            const topOSPercent = Math.round(osData.data[0] / totalRespondents * 100);
+            addInsight(insights.os, `${topOS} є домінуючою ОС для розробки (${topOSPercent}%).`);
+            const windowsPercent = Math.round((osData.data[osData.labels.indexOf('Windows')] || 0) / totalRespondents * 100);
+            addInsight(insights.os, `Windows використовують ${windowsPercent}% розробників.`);
+         }
+
+         // --- Satisfaction Insights ---
+         const satisfactionData = prepareGenericDistributionData(data, 'satisfaction');
+         if (satisfactionData.labels.length > 0) {
+            const satisfiedPercent = Math.round((satisfactionData.data[satisfactionData.labels.indexOf('Задоволений(а)')] || 0) / totalRespondents * 100);
+            addInsight(insights.satisfaction, `${satisfiedPercent}% респондентів задоволені поточною роботою та зарплатою.`);
+            const dissatisfiedSalaryPercent = Math.round((satisfactionData.data[satisfactionData.labels.indexOf('Незадоволений(а) (ЗП)')] || 0) / totalRespondents * 100);
+             const dissatisfiedBothPercent = Math.round((satisfactionData.data[satisfactionData.labels.indexOf('Незадоволений(а) (Робота та ЗП)')] || 0) / totalRespondents * 100);
+            addInsight(insights.satisfaction, `Близько ${dissatisfiedSalaryPercent + dissatisfiedBothPercent}% не задоволені рівнем зарплати (частково або повністю).`);
+         }
+
+         // --- AI Usage Insights ---
+        const aiUsageData = prepareGenericDistributionData(data, 'aiUsage');
+        const aiOrder = ['Весь час', 'Багато', 'Трохи', 'Не користуюся (Хейтер)', 'Не вказано'];
+        aiUsageData.labels.sort((a, b) => aiOrder.indexOf(a) - aiOrder.indexOf(b)); // Sort by usage level
+        aiUsageData.data = aiUsageData.labels.map(label => {
+            const originalIndex = prepareGenericDistributionData(data, 'aiUsage').labels.indexOf(label);
+            return prepareGenericDistributionData(data, 'aiUsage').data[originalIndex] || 0;
+        });
+
+         if (aiUsageData.labels.length > 0) {
+            const frequentUsersPercent = Math.round(((aiUsageData.data[aiUsageData.labels.indexOf('Весь час')] || 0) + (aiUsageData.data[aiUsageData.labels.indexOf('Багато')] || 0)) / totalRespondents * 100);
+            addInsight(insights.aiUsage, `${frequentUsersPercent}% активно використовують інструменти ШІ у своїй роботі.`);
+            const hatersPercent = Math.round((aiUsageData.data[aiUsageData.labels.indexOf('Не користуюся (Хейтер)')] || 0) / totalRespondents * 100);
+             if (hatersPercent > 0) {
+                addInsight(insights.aiUsage, `${hatersPercent}% свідомо не використовують ШІ.`);
+             }
+         }
+
+        // --- Learning Methods Insights ---
+        const learningData = prepareLearningMethodsData(data); // Uses percentages
+        if (learningData.labels.length > 0) {
+            addInsight(insights.learningMethod, `"${learningData.labels[0]}" - найпопулярніший спосіб навчання (${learningData.data[0]}% респондентів).`);
+            const uniPercent = learningData.data[learningData.labels.indexOf('Універ')] || 0;
+            const coursesPercent = learningData.data[learningData.labels.indexOf('Курси')] || 0;
+            addInsight(insights.learningMethod, `Формальна освіта: ${uniPercent}% згадали Універ, ${coursesPercent}% - Курси.`);
+            const youtubePercent = learningData.data[learningData.labels.indexOf('Youtube Туторіали')] || 0;
+             addInsight(insights.learningMethod, `${youtubePercent}% вчилися за допомогою Youtube туторіалів.`);
+        }
+
+         // --- Device Insights ---
+         const deviceData = prepareGenericDistributionData(data, 'device');
+         if (deviceData.labels.length > 0) {
+            const androidPercent = Math.round((deviceData.data[deviceData.labels.indexOf('Android')] || 0) / totalRespondents * 100);
+            const iphonePercent = Math.round((deviceData.data[deviceData.labels.indexOf('iPhone')] || 0) / totalRespondents * 100);
+            addInsight(insights.device, `Розподіл основних девайсів: ${androidPercent}% Android, ${iphonePercent}% iPhone.`);
+             if (androidPercent > iphonePercent) {
+                 addInsight(insights.device, `Android-смартфони трохи популярніші як основний девайс серед розробників.`);
+             } else if (iphonePercent > androidPercent) {
+                  addInsight(insights.device, `iPhone трохи популярніший як основний девайс серед розробників.`);
+             }
+         }
+     }
+
+
+    // --- Chart Creation ---
+    function createChart(ctx, type, data, options = {}) {
+        // Destroy previous chart instance if exists
+        if (charts[ctx.canvas.id]) {
+            charts[ctx.canvas.id].destroy();
+        }
+
+        const computedStyle = getComputedStyle(document.documentElement);
+        const textColor = computedStyle.getPropertyValue('--text-color');
+        const gridColor = computedStyle.getPropertyValue('--chart-grid');
+         const palette = [
+            computedStyle.getPropertyValue('--palette-1'),
+            computedStyle.getPropertyValue('--palette-2'),
+            computedStyle.getPropertyValue('--palette-3'),
+            computedStyle.getPropertyValue('--palette-4'),
+            computedStyle.getPropertyValue('--palette-5'),
+            computedStyle.getPropertyValue('--palette-6'),
+        ];
+        const satisfactionColors = [
+             computedStyle.getPropertyValue('--success-color'), // Так
+             computedStyle.getPropertyValue('--warning-color'), // Ні, ЗП
+             computedStyle.getPropertyValue('--error-color'),   // Ні, робота
+             computedStyle.getPropertyValue('--error-color'),   // Ні, обидва
+             gridColor // Не вказано
+        ];
+
+         let backgroundColors = palette; // Default for pie/doughnut
+         if (type === 'bar' || type === 'line') {
+             backgroundColors = palette[0]; // Use first color for bars/lines by default
+         }
+         if (ctx.canvas.id === 'satisfactionChart') {
+             // Map colors based on labels
+             const satLabels = data.labels;
+             backgroundColors = satLabels.map(label => {
+                 if (label.includes('Задоволений')) return satisfactionColors[0];
+                 if (label.includes('(ЗП)')) return satisfactionColors[1];
+                  if (label.includes('(Робота та ЗП)')) return satisfactionColors[3]; // Both
+                  if (label.includes('(Робота)')) return satisfactionColors[2];
+                 return satisfactionColors[4]; // Default/Не вказано
+             });
+         }
+
+
+        const defaultOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                     display: type === 'pie' || type === 'doughnut' || ctx.canvas.id === 'satisfactionChart', // Show legend for pies/doughnuts and satisfaction
+                    position: 'bottom',
+                    labels: {
+                         color: textColor,
+                         padding: 15,
+                         boxWidth: 12,
+                         font: { size: 11 }
+                     }
+                 },
+                 tooltip: {
+                     backgroundColor: 'rgba(0,0,0,0.7)',
+                     titleColor: '#ffffff',
+                     bodyColor: '#ffffff',
+                     padding: 10,
+                     cornerRadius: 5
+                 }
+            },
+             scales: (type === 'bar' || type === 'line') ? { // Only add scales for bar/line
+                x: {
+                    grid: { display: false, color: gridColor },
+                    ticks: { color: textColor }
+                 },
+                 y: {
+                     beginAtZero: true,
+                     grid: { color: gridColor },
+                     ticks: { color: textColor }
+                 }
+            } : {}, // No scales for pie/doughnut
+            // Specific options for line chart (correlation)
+             ...(type === 'line' && {
+                 elements: {
+                     line: { tension: 0.1 }, // Slight curve
+                     point: { radius: 5, hoverRadius: 7 }
+                 }
+             }),
+            // Specific options for bar chart (learning methods)
+             ...(ctx.canvas.id === 'learningMethodChart' && {
+                 indexAxis: 'y', // Horizontal bars if many categories
+                 scales: {
+                     x: {
+                         ticks: {
+                             callback: function(value) { return value + "%" } // Add percentage sign
+                         }
+                     }
+                 },
+                  plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ': ' + context.parsed.x + '%';
+                            }
+                        }
+                    }
+                }
+             }),
+
+         };
+
+        const chartConfig = {
+             type: type,
+             data: {
+                 labels: data.labels,
+                 datasets: [{
+                     label: options.datasetLabel || 'Кількість', // Default label
+                     data: data.data,
+                     backgroundColor: backgroundColors,
+                     borderColor: (type === 'line') ? palette[0] : (type === 'bar' ? backgroundColors : palette.map(c => c + 'cc')), // Add slight border to bars/pies
+                     borderWidth: (type === 'pie' || type === 'doughnut') ? 0 : 1.5,
+                     ...(type === 'line' && { fill: false }), // Don't fill under line chart
+                 }]
+             },
+            options: { ...defaultOptions, ...options } // Merge default and specific options
+        };
+
+         // For Correlation Chart (Line) - data format is {x, y}
+        if (ctx.canvas.id === 'correlationChart') {
+            chartConfig.data = {
+                // labels: data.map(p => p.x), // Labels are derived from points for line chart
+                 datasets: [{
+                     label: 'Медіанна Зарплата ($)',
+                     data: data, // Already in {x, y} format
+                     backgroundColor: palette[0],
+                     borderColor: palette[0],
+                     borderWidth: 2,
+                     fill: false,
+                     tension: 0.1
+                 }]
+             };
+            // Adjust scales for correlation chart to use category axis for experience labels
+            chartConfig.options.scales = {
+                x: {
+                     type: 'category', // Use category axis for experience labels
+                     labels: data.map(p => p.x), // Provide the labels explicitly
+                     grid: { display: false, color: gridColor },
+                     ticks: { color: textColor }
+                 },
+                 y: {
+                     beginAtZero: false, // Salary doesn't have to start at 0
+                     grid: { color: gridColor },
+                     ticks: {
+                         color: textColor,
+                         callback: function(value) { return '$' + value; } // Add dollar sign
+                     }
+                 }
+            };
+         }
+
+         charts[ctx.canvas.id] = new Chart(ctx, chartConfig);
+     }
+
+    function createAllCharts(processedData) {
+        createChart(document.getElementById('experienceChart').getContext('2d'), 'bar', prepareExperienceData(processedData), { datasetLabel: 'Розробників' });
+        createChart(document.getElementById('salaryChart').getContext('2d'), 'bar', prepareSalaryData(processedData), { datasetLabel: 'Розробників'});
+        createChart(document.getElementById('techChart').getContext('2d'), 'doughnut', prepareTechData(processedData), { datasetLabel: 'Згадок'});
+        createChart(document.getElementById('correlationChart').getContext('2d'), 'line', prepareCorrelationData(processedData));
+        createChart(document.getElementById('workSphereChart').getContext('2d'), 'pie', prepareGenericDistributionData(processedData, 'workSphere'), { datasetLabel: 'Розробників'});
+        createChart(document.getElementById('osChart').getContext('2d'), 'pie', prepareGenericDistributionData(processedData, 'os'), { datasetLabel: 'Розробників'});
+        createChart(document.getElementById('satisfactionChart').getContext('2d'), 'doughnut', prepareGenericDistributionData(processedData, 'satisfaction'), { datasetLabel: 'Розробників'});
+
+        // AI Usage - Use Bar chart as order matters somewhat
+        const aiUsageData = prepareGenericDistributionData(processedData, 'aiUsage');
+        const aiOrder = ['Весь час', 'Багато', 'Трохи', 'Не користуюся (Хейтер)', 'Не вказано'];
+        aiUsageData.labels.sort((a, b) => aiOrder.indexOf(a) - aiOrder.indexOf(b)); // Sort by usage level
+        aiUsageData.data = aiUsageData.labels.map(label => {
+             const originalIndex = prepareGenericDistributionData(processedData, 'aiUsage').labels.indexOf(label); // Find original count
+             return prepareGenericDistributionData(processedData, 'aiUsage').data[originalIndex] || 0;
+        });
+        createChart(document.getElementById('aiUsageChart').getContext('2d'), 'bar', aiUsageData, { datasetLabel: 'Розробників'});
+
+        createChart(document.getElementById('learningMethodChart').getContext('2d'), 'bar', prepareLearningMethodsData(processedData), { datasetLabel: '% респондентів'});
+        createChart(document.getElementById('deviceChart').getContext('2d'), 'pie', prepareGenericDistributionData(processedData, 'device'), { datasetLabel: 'Розробників'});
+
+        updateChartColors(); // Apply theme colors after creation
+     }
+
+
+    // --- Initialization ---
+    document.addEventListener('DOMContentLoaded', () => {
+        // Set initial theme
+        const savedTheme = localStorage.getItem('theme');
+        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        applyTheme(savedTheme || (prefersDark ? 'dark' : 'light'));
+
+        // Show loading indicator
+        document.getElementById('loading').style.display = 'block';
+        document.getElementById('dashboard').style.display = 'none'; // Keep dashboard hidden
+
+        // Get embedded CSV data
+        const csvDataElement = document.getElementById('csvDataScript');
+        if (!csvDataElement || !csvDataElement.textContent) {
+             showError("Не вдалося знайти вбудовані CSV дані.");
+             return;
+        }
+        const csvData = csvDataElement.textContent;
+
+        // Use setTimeout to allow the loading indicator to render before parsing starts
+        setTimeout(() => {
+            try {
+                Papa.parse(csvData, {
+                    header: true,
+                    skipEmptyLines: true,
+                    complete: function(results) {
+                        if (results.errors.length > 0) {
+                             // Try to provide more specific error info
+                             let errorMsg = `Помилка розбору CSV: ${results.errors[0].message}.`;
+                             if(results.errors[0].row) errorMsg += ` Рядок: ${results.errors[0].row + 1}.`; // PapaParse row index is 0-based
+                             console.error("PapaParse Errors:", results.errors);
+                             showError(errorMsg);
+                             return;
+                        }
+
+                        if (!results.data || results.data.length === 0) {
+                            showError('CSV дані порожні або мають невірний формат.');
+                            return;
+                        }
+
+                        // Check for essential columns
+                        const expectedHeaders = Object.values(COLUMN_MAPPING);
+                        const actualHeaders = results.meta.fields;
+                        const missingHeaders = expectedHeaders.filter(h => !actualHeaders.includes(h));
+                        if(missingHeaders.length > 0) {
+                           console.warn("Відсутні очікувані колонки:", missingHeaders);
+                           // Don't necessarily fail, parsing functions might handle missing data
+                           // showError(`Відсутні необхідні колонки в CSV: ${missingHeaders.join(', ')}`);
+                           // return;
+                        }
+
+                        surveyData = processSurveyData(results.data);
+
+                        if (surveyData.length > 0) {
+                            hideError();
+                            createInsights(surveyData);
+                            createAllCharts(surveyData);
+                            // Show dashboard with fade-in effect
+                            const dashboard = document.getElementById('dashboard');
+                            dashboard.style.display = 'grid';
+                            setTimeout(() => dashboard.classList.add('visible'), 50); // Small delay for transition
+                        } else if (!document.getElementById('errorMessage').style.display || document.getElementById('errorMessage').style.display === 'none') {
+                            // If processSurveyData filtered everything out but didn't explicitly show an error
+                            showError("Не вдалося обробити дані. Можливо, формат даних невірний.");
+                        }
+                        document.getElementById('loading').style.display = 'none'; // Hide loading indicator
+                    },
+                    error: function(error) {
+                         console.error("PapaParse File Read Error:", error);
+                         showError('Критична помилка при читанні CSV даних: ' + error.message);
+                    }
+                });
+            } catch (error) {
+                 console.error("General Error during init:", error);
+                 showError('Виникла неочікувана помилка при ініціалізації: ' + error.message);
+            }
+         }, 50); // 50ms delay
+    });
+
+  </script>
+
+</body>
+</html>
